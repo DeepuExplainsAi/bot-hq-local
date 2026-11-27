@@ -55,5 +55,7 @@ await so.waitForTimeout(1500);
 await shot(so, 'sign-in');
 await fetch(`${mock}/__signed-in`);
 
-await browser.close();
-if (failures.length) { console.log('STEPS FAILED:\n' + failures.join('\n')); process.exitCode = 1; }
+// browser.close() can hang on the open event stream; the screenshots are already on disk.
+await Promise.race([browser.close(), new Promise((r) => setTimeout(r, 5000))]);
+if (failures.length) console.log('STEPS FAILED:\n' + failures.join('\n'));
+process.exit(failures.length ? 1 : 0);

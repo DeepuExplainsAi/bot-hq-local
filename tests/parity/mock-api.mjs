@@ -51,4 +51,4 @@ http.createServer((req, res) => {
   const body = hit[2]();
   if (body === null) { res.writeHead(204); res.end(); return; }
   res.writeHead(200, { 'content-type': 'application/json' }); res.end(JSON.stringify(body));
-}).listen(Number(process.env.MOCK_PORT ?? 8799), '127.0.0.1');
+}).on('upgrade', (_req, socket) => socket.destroy()).listen(Number(process.env.MOCK_PORT ?? 8799), '127.0.0.1');
