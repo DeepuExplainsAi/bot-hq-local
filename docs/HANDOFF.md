@@ -32,7 +32,7 @@ The earlier billing block ("recent account payments have failed") only affected 
 | 0 | PARITY.md, mock API, screenshot workflow, baselines | DONE (tag part-0-done) |
 | 1a | Server desktop mode (`BOTHQ_LOCAL=1`) | DONE (tag part-1a-done) |
 | 1b | Electron shell in `desktop/`, Hermes sidecar, desktop CI | DONE (tag part-1b-done) |
-| 2 | Auth: single local user, per-install token | IN PROGRESS (pushed, waiting for CI) |
+| 2 | Auth: single local user, per-install token | DONE (tag part-2-done) |
 | 3 | Bot screens: Chromium per bot, CDP screencast viewer | TODO |
 | 4 | Composio -> local MCP servers, docs/local-tools.md, THIRD_PARTY.md | TODO |
 | 5 | electron-builder + Actions matrix (win/mac/linux) | TODO |
@@ -94,5 +94,6 @@ Split because one part would exceed ~15 files.
 ## Part 2 (auth) state
 - Design (no server change, no new route): `desktop/localauth.cjs` derives the owner key from the per-install `<data>/secret.key` (HMAC 'owner-login', as `isOwnerKey` expects), calls `POST /api/auth/owner {link:true}` (loopback only, no forwarding headers), and the shell loads the one-time link. It sets the session cookie for the fixed local user `me@localhost` and redirects to `/`; the sign-in page is never shown. Sign-in page file, Google routes and `ALLOWED_EMAILS` stay untouched (unused locally).
 - Tests: `tests/local/smoke.mjs` now signs in this way (API 401 without a session, link works once then 410, wrong key and forwarded request refused 403). Electron smoke (`desktop/main.cjs --smoke`) fails unless `/api/auth/me` shows `me@localhost`.
-- Not run in the sandbox (Compute Rule): result comes from the CI run on the commit that follows this note.
+- CI (runs 45994660392 parity, 45994660370 desktop, both green): security tests 51/51, local smoke 13/13 including the two new auth steps, Electron smoke `SMOKE OK` (signed in as me@localhost, no off-machine requests), all screenshots match. Nothing run in the sandbox.
+- NEXT: Part 3 (bot screens: Electron Chromium, one session partition per bot, CDP screencast into the existing viewer protocol; refresh the details-panel baselines on purpose with a deterministic mock frame).
 - Known: if the user logs out in the app, the sign-in page shows and the only way back is restarting the app (it signs in again on every launch).
