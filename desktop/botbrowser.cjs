@@ -4,7 +4,8 @@
 const { app, BrowserWindow } = require('electron');
 
 const W = 1280, H = 800;
-const HOME = 'data:text/html;charset=utf-8,' + encodeURIComponent('<!doctype html><title>Home</title><body style="margin:0;background:#f6f6f4">');
+// The bot's own home page (served by the app's server); a blank page if there is none.
+const HOME = process.env.BOTHQ_HOME_URL || 'about:blank';
 
 app.setPath('userData', process.env.BOTHQ_BROWSER_PROFILE);
 app.commandLine.appendSwitch('remote-debugging-port', process.env.BOTHQ_CDP_PORT);

@@ -34,7 +34,7 @@ The earlier billing block ("recent account payments have failed") only affected 
 | 1b | Electron shell in `desktop/`, Hermes sidecar, desktop CI | DONE (tag part-1b-done) |
 | 2 | Auth: single local user, per-install token | DONE (tag part-2-done) |
 | 3a | Bot browser per bot (Electron Chromium process), RFB-over-CDP viewer, Hermes `cdp_url`, preview screenshot | DONE (tag part-3a-done) |
-| 3b | Home (new-tab) page port from `hq-home.py`/`home.html`, reset screen, deterministic viewer frame in the mock + refreshed baselines | TODO |
+| 3b | Home (new-tab) page port, reset screen, deterministic viewer frame in the mock + refreshed baselines | IN PROGRESS (pushed, waiting for CI) |
 | 4 | Composio -> local MCP servers, docs/local-tools.md, THIRD_PARTY.md | TODO |
 | 5 | electron-builder + Actions matrix (win/mac/linux) | TODO |
 | 6 | Verification report | TODO |
@@ -109,3 +109,9 @@ Split of part 3 (>15 files): 3a = the plumbing below; 3b = look of the bot brows
 - Sandbox run (swap added in /tmp; allowed for this tiny check): `tsc --noEmit` clean, server build OK, `node tests/local/smoke.mjs` = 19/19 passed. CI (runs 45995892662 desktop, 45995892691 parity, both green): smoke 19/19, Electron `BOT BROWSER OK 1280x800` (a hidden window does produce frames, so the risk below did not occur), security 51/51, all screenshots match.
 - Not identical (add to audit when final): control-mode keyboard shortcuts with Ctrl/Cmd (copy/paste/select-all) are not forwarded as editing commands; clipboard sync none; cursor shape is noVNC's default; the browser window is never shown on the laptop (viewer only); new-tab page is blank until 3b.
 - Risk to check in CI: a hidden Electron window must keep producing screencast frames (flag `show:false` + `backgroundThrottling:false`). If CI shows no frames, switch `botbrowser.cjs` to `webPreferences.offscreen: true` or `showInactive()` off-screen.
+
+## Part 3b state
+- Home page: `server/src/home.ts` renders the unchanged `server/box/home.html` (look from `desk.ts` `lookFor`: colours, avatar, wallpaper) at `/bot-home/<bot>/<key>/` (key = HMAC of the install secret and bot id, so only that bot's browser, which is started with the URL in `BOTHQ_HOME_URL`, can open it; mounted only in desktop mode). The page's data calls are rewritten to that path. Look changes are picked up by the page's own 4 s stamp poll. Only a "Browser" tile is listed (a laptop's own apps are not launched from the page: "not identical", add to the audit at Part 6).
+- Reset screen (`POST /api/bots/:id/screen/reset`): closes extra tabs and navigates the bot browser to its home page (`resetBotBrowser` in `cdpscreen.ts`).
+- Mock API (`tests/parity/mock-api.mjs`) now serves one fixed frame (`tests/parity/screen.jpg`, 1280x800, made with PIL) over the viewer socket as RFB + Tight JPEG, so the details-panel preview is deterministic. Baselines CHANGE ON PURPOSE (preview shows the frame instead of "Couldn't reach Doug's screen"); refresh with `update_baselines=true`, then confirm a compare run is green.
+- Smoke: +2 steps (home page and key, reset navigates home). Sandbox: `tsc` clean, `node tests/local/smoke.mjs` 21/21.

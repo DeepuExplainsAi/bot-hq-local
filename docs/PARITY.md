@@ -38,5 +38,5 @@ Local-only expected differences are listed in `docs/local-audit.md` section (c).
 - [ ] Data persists across restarts (SQLite)
 
 ## Baseline notes
-- The mock API has no viewer, so the details-panel screen preview shows "Couldn't reach Doug's screen" in every baseline. Part 3 refreshes these on purpose.
+- Since part 3b the mock API serves one fixed viewer frame (`tests/parity/screen.jpg`), so the details-panel preview shows that picture. Baselines were refreshed on purpose for it. (Before 3b they showed "Couldn't reach Doug's screen".)
 - Screenshots are compared by SHA-256 on the same ubuntu runner image; a font or Chromium update can trigger a refresh (`update_baselines=true`) after a human look.

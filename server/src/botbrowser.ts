@@ -3,6 +3,7 @@ import fs from 'node:fs';
 import net from 'node:net';
 import path from 'node:path';
 import { env } from './env.js';
+import { homeUrl } from './home.js';
 import { profilesRoot } from './paths.js';
 
 /**
@@ -51,7 +52,7 @@ async function launch(botId: string): Promise<Running> {
   const keep = ['PATH', 'HOME', 'USER', 'USERPROFILE', 'APPDATA', 'LOCALAPPDATA', 'TEMP', 'TMP', 'SystemRoot', 'LANG', 'DISPLAY', 'WAYLAND_DISPLAY', 'XDG_RUNTIME_DIR', 'XAUTHORITY', 'DBUS_SESSION_BUS_ADDRESS'];
   const childEnv = {
     ...Object.fromEntries(keep.filter((k) => process.env[k]).map((k) => [k, process.env[k]])),
-    BOTHQ_BROWSER_HOST: '1', BOTHQ_BROWSER_PROFILE: profile, BOTHQ_CDP_PORT: String(port),
+    BOTHQ_BROWSER_HOST: '1', BOTHQ_BROWSER_PROFILE: profile, BOTHQ_CDP_PORT: String(port), BOTHQ_HOME_URL: homeUrl(botId),
   };
   const child = spawn(exe, args, { env: childEnv, stdio: 'ignore', windowsHide: true });
   child.once('error', (e) => console.warn(`[browser] ${botId}: ${e.message}`));

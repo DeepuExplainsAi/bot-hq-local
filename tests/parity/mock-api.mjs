@@ -1,6 +1,8 @@
 // Deterministic stand-in for the Bot HQ API, used only to take UI baseline screenshots.
 // It serves fixed data so the screenshots do not depend on the real backend, Hermes or any key.
+import fs from 'node:fs';
 import http from 'node:http';
+import { WebSocketServer } from 'ws';
 
 const T0 = Date.UTC(2026, 0, 15, 12, 0, 0);
 const bot = (id, name, label, shape, color, extra = {}) => ({
@@ -41,6 +43,35 @@ const routes = [
 ];
 const state = { signedIn: true };
 
+const wss = new WebSocketServer({ noServer: true, handleProtocols: (p) => (p.has('binary') ? 'binary' : false) });
+const FRAME = fs.readFileSync(new URL('./screen.jpg', import.meta.url));
+const W = 1280, H = 800;
+const u16 = (n) => { const b = Buffer.alloc(2); b.writeUInt16BE(n); return b; };
+const u32 = (n) => { const b = Buffer.alloc(4); b.writeUInt32BE(n); return b; };
+function serveFrame(ws) {
+  let stage = 0, buf = Buffer.alloc(0);
+  ws.send(Buffer.from('RFB 003.008\n'));
+  ws.on('message', (d) => {
+    buf = Buffer.concat([buf, d]);
+    for (;;) {
+      if (stage === 0 && buf.length >= 12) { buf = buf.subarray(12); stage = 1; ws.send(Buffer.from([1, 1])); }
+      else if (stage === 1 && buf.length >= 1) { buf = buf.subarray(1); stage = 2; ws.send(u32(0)); }
+      else if (stage === 2 && buf.length >= 1) {
+        buf = buf.subarray(1); stage = 3;
+        ws.send(Buffer.concat([u16(W), u16(H), Buffer.from([32, 24, 0, 1, 0, 255, 0, 255, 0, 255, 16, 8, 0, 0, 0, 0]), u32(4), Buffer.from('Doug')]));
+      } else if (stage === 3 && buf.length >= 1) {
+        const len = { 0: 20, 3: 10, 4: 8, 5: 6 }[buf[0]] ?? (buf[0] === 2 && buf.length >= 4 ? 4 + 4 * buf.readUInt16BE(2) : 0);
+        if (!len || buf.length < len) break;
+        const t = buf[0]; buf = buf.subarray(len);
+        if (t === 3) {
+          const n = FRAME.length, l = [n & 0x7f | 0x80, (n >> 7) & 0x7f | 0x80, (n >> 14) & 0xff];
+          ws.send(Buffer.concat([Buffer.from([0, 0]), u16(1), u16(0), u16(0), u16(W), u16(H), u32(7), Buffer.from([0x90, ...l]), FRAME]));
+        }
+      } else break;
+    }
+  });
+  ws.on('error', () => {});
+}
 http.createServer((req, res) => {
   const url = new URL(req.url, 'http://x');
   if (url.pathname === '/__signed-out') { state.signedIn = false; res.end('ok'); return; }
@@ -51,4 +82,8 @@ http.createServer((req, res) => {
   const body = hit[2]();
   if (body === null) { res.writeHead(204); res.end(); return; }
   res.writeHead(200, { 'content-type': 'application/json' }); res.end(JSON.stringify(body));
-}).on('upgrade', (_req, socket) => socket.destroy()).listen(Number(process.env.MOCK_PORT ?? 8799), '127.0.0.1');
+}).on('upgrade', (req, socket, head) => {
+  // The bot screen viewer gets one fixed picture (RFB with a Tight JPEG rectangle), so the screen preview is the same every run.
+  if (/^\/api\/bots\/[^/]+\/screen/.test(req.url ?? '')) wss.handleUpgrade(req, socket, head, serveFrame);
+  else socket.destroy();
+}).listen(Number(process.env.MOCK_PORT ?? 8799), '127.0.0.1');

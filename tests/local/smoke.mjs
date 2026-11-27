@@ -178,6 +178,23 @@ try {
     const code = await new Promise((res) => { ws.on('unexpected-response', (_q, r) => res(r.statusCode)); ws.on('open', () => res(200)); ws.on('error', () => {}); });
     ok(code === 401, `HTTP ${code}`);
   });
+  await step('the bot browser opens its own home page (greeting, avatar, clock), reachable only with its key', async () => {
+    const url = fs.readFileSync(path.join(DATA, 'profiles', bot.id, 'browser', 'home-url'), 'utf8');
+    const key = crypto.createHmac('sha256', fs.readFileSync(path.join(DATA, 'secret.key'), 'utf8').trim()).update(`home:${bot.id}`).digest('hex');
+    ok(url === `${BASE}/bot-home/${bot.id}/${key}/`, `home url ${url}`);
+    const page = await fetch(url);
+    const html = await page.text();
+    ok(page.status === 200 && html.includes('Welcome back, Doug') && html.includes('id="clock"') && html.includes('<svg'), `page: HTTP ${page.status}`);
+    ok(html.includes(`'/bot-home/${bot.id}/${key}/apps'`) && !html.includes("'/apps'"), 'page still asks the root for its data');
+    ok(!html.includes('{{'), 'unfilled placeholder in the page');
+    ok((await fetch(`${BASE}/bot-home/${bot.id}/${'0'.repeat(64)}/`)).status === 404, 'wrong key was accepted');
+    const stamp = await (await fetch(`${url}stamp`)).json();
+    ok(typeof stamp.stamp === 'string' && stamp.stamp.length > 10, 'no stamp');
+  });
+  await step('reset screen brings the bot browser back to its home page', async () => {
+    ok((await api('POST', `/api/bots/${bot.id}/screen/reset`)).status === 200, 'reset failed');
+    ok(inputLog().some((e) => e.method === 'Page.navigate' && e.url.includes(`/bot-home/${bot.id}/`)), 'no navigation to the home page');
+  });
   await step('the preview screenshot comes from the bot browser', async () => {
     const r = await fetch(`${BASE}/api/bots/${bot.id}/screenshot`, { headers: { cookie } });
     ok(r.status === 200 && r.headers.get('content-type') === 'image/jpeg' && (await r.arrayBuffer()).byteLength > 10, `HTTP ${r.status}`);

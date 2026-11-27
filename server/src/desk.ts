@@ -286,7 +286,7 @@ function avatarSvg(shape: string, fill: string): string {
 
 // ---------------------------------------------------------------- the look of one screen
 
-function lookFor(bot: DeskBot, manageChrome: boolean): { stamp: string; payload: string } {
+export function lookFor(bot: DeskBot, manageChrome: boolean): { stamp: string; payload: string; full: Record<string, any> } {
   const hex = colorHex(bot.avatarColor);
   const p = paletteFor(hex);
   const look = {
@@ -297,7 +297,8 @@ function lookFor(bot: DeskBot, manageChrome: boolean): { stamp: string; payload:
     wallSvg: wallpaperSvg(p, bot.id),
   };
   const stamp = sha(`${bundle().hash}\n${JSON.stringify(look)}`).slice(0, 20);
-  return { stamp, payload: gzipSync(Buffer.from(JSON.stringify({ stamp, ...look }), 'utf8')).toString('base64') };
+  const full = { stamp, ...look };
+  return { stamp, payload: gzipSync(Buffer.from(JSON.stringify(full), 'utf8')).toString('base64'), full };
 }
 
 /** Calls for one screen run one after another, so a rename and a reset cannot trip over each other. */

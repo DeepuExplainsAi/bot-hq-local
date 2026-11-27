@@ -5,6 +5,7 @@ import { orgo, OrgoError, type OrgoScreen } from './orgo.js';
 import { cdpPortFor, dressScreen, resetScreen, undressScreen, type DeskBot } from './desk.js';
 import { box } from './box.js';
 import fs from 'node:fs/promises';
+import { resetBotBrowser } from './cdpscreen.js';
 import { browsersAvailable, ensureBotBrowser, stopBotBrowser } from './botbrowser.js';
 import { libraryRoot, profilesRoot } from './paths.js';
 import type { ComputerState } from './types.js';
@@ -249,7 +250,7 @@ export async function screenForWork(userId: string, botId: string): Promise<void
 
 /** Close everything on the bot's screen and bring its browser back to the home screen. Logins stay. */
 export async function resetBotScreen(userId: string, botId: string): Promise<void> {
-  if (env.local) return;
+  if (env.local) { if (browsersAvailable()) await resetBotBrowser(botId); return; }
   const s = await screenFor(userId, botId);
   const bot = deskBot(botId);
   if (bot) await resetScreen(bot, s.screenId, { manageChrome: managesChrome(botId) });

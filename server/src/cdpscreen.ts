@@ -1,5 +1,6 @@
 import { WebSocket } from 'ws';
 import { ensureBotBrowser } from './botbrowser.js';
+import { homeUrl } from './home.js';
 
 /**
  * The bot's browser as a VNC screen. The viewer (noVNC) speaks RFB, so this answers it as an RFB server:
@@ -213,4 +214,13 @@ export async function serveBotScreen(
     }
   };
   return { input, close: () => { closed = true; cdp.send('Page.stopScreencast').catch(() => {}).finally(() => cdp.close()); } };
+}
+
+/** Back to a clean start: every extra tab closed, the browser on its home page. Logins stay (they live in the profile). */
+export async function resetBotBrowser(botId: string): Promise<void> {
+  const base = await ensureBotBrowser(botId);
+  const pages = ((await (await fetch(`${base}/json/list`)).json()) as any[]).filter((t) => t.type === 'page');
+  for (const extra of pages.slice(1)) await fetch(`${base}/json/close/${extra.id}`).catch(() => {});
+  const cdp = await Cdp.open(base);
+  try { await cdp.send('Page.navigate', { url: homeUrl(botId) }); } finally { cdp.close(); }
 }
