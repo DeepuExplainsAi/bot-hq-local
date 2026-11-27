@@ -33,7 +33,7 @@ The earlier billing block ("recent account payments have failed") only affected 
 | 1a | Server desktop mode (`BOTHQ_LOCAL=1`) | DONE (tag part-1a-done) |
 | 1b | Electron shell in `desktop/`, Hermes sidecar, desktop CI | DONE (tag part-1b-done) |
 | 2 | Auth: single local user, per-install token | DONE (tag part-2-done) |
-| 3a | Bot browser per bot (Electron Chromium process), RFB-over-CDP viewer, Hermes `cdp_url`, preview screenshot | IN PROGRESS (pushed, waiting for CI) |
+| 3a | Bot browser per bot (Electron Chromium process), RFB-over-CDP viewer, Hermes `cdp_url`, preview screenshot | DONE (tag part-3a-done) |
 | 3b | Home (new-tab) page port from `hq-home.py`/`home.html`, reset screen, deterministic viewer frame in the mock + refreshed baselines | TODO |
 | 4 | Composio -> local MCP servers, docs/local-tools.md, THIRD_PARTY.md | TODO |
 | 5 | electron-builder + Actions matrix (win/mac/linux) | TODO |
@@ -106,6 +106,6 @@ Split of part 3 (>15 files): 3a = the plumbing below; 3b = look of the bot brows
 - `server/src/cdpscreen.ts`: the viewer protocol stays RFB so `ComputerViewer.tsx`/noVNC are untouched. The server answers as an RFB server: DevTools `Page.startScreencast` JPEG frames go out as Tight-JPEG rectangles; in control mode mouse/keys become `Input.dispatchMouseEvent/KeyEvent`; watch mode drops input. Also `Page.captureScreenshot` for `GET /api/bots/:id/screenshot` (was Orgo).
 - Wiring: `vnc.ts` (local branch), `engine.ts` (`browser.cdp_url` and `BROWSER_CDP_URL` in the bot's Hermes config), `computer.ts` (start on work, stop on bot delete), `routes.ts`, `index.ts` (stop on quit), `env.ts` (`browserCmd`).
 - Tests: `tests/local/fake-browser.mjs` + `tests/local/rfb-client.cjs` + 6 new steps in `tests/local/smoke.mjs` (own profile and port per bot, cdp_url in Hermes config, watch mode picture + dropped input, control click arrives at 10,20, no-session viewer refused 401, screenshot route, delete stops browser and removes profile, quit stops browsers). Electron smoke now also opens the real primary bot browser in the viewer protocol (`BOT BROWSER OK`).
-- Sandbox run (swap added in /tmp; allowed for this tiny check): `tsc --noEmit` clean, server build OK, `node tests/local/smoke.mjs` = 19/19 passed. CI result: below.
+- Sandbox run (swap added in /tmp; allowed for this tiny check): `tsc --noEmit` clean, server build OK, `node tests/local/smoke.mjs` = 19/19 passed. CI (runs 45995892662 desktop, 45995892691 parity, both green): smoke 19/19, Electron `BOT BROWSER OK 1280x800` (a hidden window does produce frames, so the risk below did not occur), security 51/51, all screenshots match.
 - Not identical (add to audit when final): control-mode keyboard shortcuts with Ctrl/Cmd (copy/paste/select-all) are not forwarded as editing commands; clipboard sync none; cursor shape is noVNC's default; the browser window is never shown on the laptop (viewer only); new-tab page is blank until 3b.
 - Risk to check in CI: a hidden Electron window must keep producing screencast frames (flag `show:false` + `backgroundThrottling:false`). If CI shows no frames, switch `botbrowser.cjs` to `webPreferences.offscreen: true` or `showInactive()` off-screen.
