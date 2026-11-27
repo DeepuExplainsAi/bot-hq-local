@@ -29,8 +29,9 @@ The earlier billing block ("recent account payments have failed") only affected 
 ## Part status
 | Part | What | Status |
 |---|---|---|
-| 0 | PARITY.md, mock API, screenshot workflow, baselines | DONE once the compare run below is green (tag part-0-done) |
-| 1 | Electron shell, local runtime, Hermes sidecar, app-data paths | TODO |
+| 0 | PARITY.md, mock API, screenshot workflow, baselines | DONE (tag part-0-done) |
+| 1a | Server desktop mode (`BOTHQ_LOCAL=1`) | DONE (tag part-1a-done) |
+| 1b | Electron shell in `desktop/`, Hermes sidecar, desktop CI | IN PROGRESS (see Part 1b state) |
 | 2 | Auth: single local user, per-install token | TODO |
 | 3 | Bot screens: Chromium per bot, CDP screencast viewer | TODO |
 | 4 | Composio -> local MCP servers, docs/local-tools.md, THIRD_PARTY.md | TODO |
@@ -73,5 +74,13 @@ Split because one part would exceed ~15 files.
 - Tests: `tests/local/smoke.mjs` (+ `fake-hermes.mjs`), wired into `parity.yml`.
 - Verified in the sandbox (low memory needs swap in /tmp): `tsc --noEmit` clean, `tsc` build OK, `node tests/security.mjs` = 51 passed 0 failed, `node tests/local/smoke.mjs` = 11/11 passed. CI result: see below.
 
-### 1b: NEXT
+### 1b: planned scope
 `desktop/` Electron main: free loopback port, fork the server with env above, wait for /api/health, BrowserWindow, quit handling; Hermes sidecar install (uv into app-data, progress screen, native Windows first, no silent WSL/Docker); Electron xvfb smoke job in CI. `better-sqlite3` must be rebuilt for Electron's ABI (electron-rebuild) in Step 5.
+
+
+## Part 1b state (checked against git/Actions on 2026-11-27)
+- Commits after `part-1a-done`: `843ef3a` Electron shell + Hermes first-run setup (uv) + desktop CI; `33f5ff6` Hermes from lock file; `e3dd4f2` keep Hermes source checkout; `2ff1e41` parity harness stubs logos / refuses off-machine requests; desktop CI runs Hermes only with HERMES_HOME set.
+- Draft PR #1 (`local-installer`) is open.
+- Actions: `desktop` workflow is green on `2ff1e41`. `parity` is red on `2ff1e41`: ALL 12 shots differ (light and dark), not only chat-light.
+- Cause: `web/` is byte-identical to `part-0-done`; the only change is the harness in `tests/parity/shoot.mjs` (app logos were loaded from the network; now a fixed stub). That changes pixels in the harness, not in the app. No UI change.
+- Fix: refresh baselines on purpose (`parity` workflow_dispatch `update_baselines=true`), then confirm the next push run compares green, then tag `part-1b-done`.
