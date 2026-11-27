@@ -36,3 +36,7 @@ Local-only expected differences are listed in `docs/local-audit.md` section (c).
 - [ ] Files: list, download, raw
 - [ ] Voice: session mint, TTS preview, dictation
 - [ ] Data persists across restarts (SQLite)
+
+## Baseline notes
+- The mock API has no viewer, so the details-panel screen preview shows "Couldn't reach Doug's screen" in every baseline. Part 3 refreshes these on purpose.
+- Screenshots are compared by SHA-256 on the same ubuntu runner image; a font or Chromium update can trigger a refresh (`update_baselines=true`) after a human look.

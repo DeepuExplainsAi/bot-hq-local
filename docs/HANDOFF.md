@@ -29,7 +29,7 @@ The earlier billing block ("recent account payments have failed") only affected 
 ## Part status
 | Part | What | Status |
 |---|---|---|
-| 0 | PARITY.md, mock API, screenshot workflow, baselines | IN PROGRESS (files pushed, first CI run pending) |
+| 0 | PARITY.md, mock API, screenshot workflow, baselines | DONE once the compare run below is green (tag part-0-done) |
 | 1 | Electron shell, local runtime, Hermes sidecar, app-data paths | TODO |
 | 2 | Auth: single local user, per-install token | TODO |
 | 3 | Bot screens: Chromium per bot, CDP screencast viewer | TODO |
@@ -38,10 +38,14 @@ The earlier billing block ("recent account payments have failed") only affected 
 | 6 | Verification report | TODO |
 
 ## Part 0 details
-Files: `tests/parity/mock-api.mjs` (fixed data API + `/__signed-out`), `tests/parity/shoot.mjs` (Playwright, 1440x900, light and dark),
-`tests/parity/compare.mjs` (hash compare, skipped while no baselines exist), `.github/workflows/parity.yml`, `docs/PARITY.md`.
-Tested: nothing run yet (sandbox cannot run Chromium). Not tried: whether the real sidebar/modals match the aria-labels used in shoot.mjs.
-Open sandbox state: a resize approval card was posted earlier; the user declined it. Ignore it.
+Files: `tests/parity/mock-api.mjs` (fixed-data API, `/__signed-out`, WS upgrades destroyed), `tests/parity/shoot.mjs` (Playwright 1440x900,
+light+dark: chat, search, new-bot, connect-apps, bot-settings, details-hidden; plus sign-in), `tests/parity/compare.mjs` (sha256 compare with docs/parity),
+`.github/workflows/parity.yml` (typecheck, build, screenshots, compare, artifact, optional baseline commit), `docs/PARITY.md`, `docs/parity/*.png` (13 baselines).
+CI history (honest): run 1 blocked by billing (private repo) -> repo made public; run 2 cancelled by me (no timeouts); run 3 failed (mock lacked /api/voice/options,
+screenshot script did not exit); run 4 green (13 shots); run 5 (workflow_dispatch update_baselines=true) green and committed the baselines.
+Known baseline quirk: the details-panel screen preview shows "Couldn't reach Doug's screen" because the mock has no viewer. Part 3 should add a deterministic
+frame to the mock and refresh the baselines on purpose (documented change, not a regression).
+Not covered by screenshots yet: voice call bar, streaming/thinking states (fixtures=working), viewer large view, Library tab, group chat.
 
 ## How to run / test
 CI only: Actions > parity > Run workflow (`update_baselines=true` commits `docs/parity/`). Locally (real machine):
@@ -51,4 +55,4 @@ CI only: Actions > parity > Run workflow (`update_baselines=true` commits `docs/
 See `docs/local-audit.md` (c). Note `server/src/env.ts` currently requires XAI/Composio/Orgo keys at import time.
 
 ## NEXT
-Push, run workflow `parity`, fix until green, run once more with `update_baselines=true`, mark Part 0 DONE, tag `part-0-done`, open the draft PR, start Part 1.
+Part 1 (Electron shell). Keep CI to ONE run per part. Sandbox cannot run Electron/Chromium: verify via Actions (add an Electron smoke job on ubuntu with xvfb).
