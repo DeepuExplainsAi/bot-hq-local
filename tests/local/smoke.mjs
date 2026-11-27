@@ -7,7 +7,7 @@ import fs from 'node:fs';
 import net from 'node:net';
 import os from 'node:os';
 import path from 'node:path';
-import Database from 'better-sqlite3';
+import { createRequire } from 'node:module';
 
 const ROOT = path.resolve(new URL('../..', import.meta.url).pathname);
 const ENTRY = path.join(ROOT, 'server/dist/index.js');
@@ -85,13 +85,29 @@ try {
     if (process.platform !== 'win32') ok((fs.statSync(key).mode & 0o077) === 0, 'secret.key is readable by others');
   });
 
-  // A signed-in user, made straight in the database (sign-in itself changes in step 2).
-  const db = new Database(path.join(DATA, 'bothq.db'));
-  const token = crypto.randomBytes(24).toString('hex');
-  db.prepare('INSERT INTO users(id,email,name,created_at) VALUES (?,?,?,?)').run('u1', 'me@localhost', 'Me', Date.now());
-  db.prepare('INSERT INTO auth_sessions(token,user_id,created_at,expires_at,owner) VALUES (?,?,?,?,?)').run(token, 'u1', Date.now(), Date.now() + 3600_000, 1);
-  db.close();
-  cookie = `bothq_session=${token}`;
+  // Sign-in as the desktop shell does it: the per-install secret opens a one-time link, no sign-in page.
+  const { signInUrl, EMAIL } = createRequire(import.meta.url)('../../desktop/localauth.cjs');
+  await step('desktop sign-in: the install secret signs in the single local user', async () => {
+    const anon = await fetch(`${BASE}/api/bots`);
+    ok(anon.status === 401, `API open without a session: HTTP ${anon.status}`);
+    const link = await signInUrl(DATA, BASE);
+    const r = await fetch(link, { redirect: 'manual' });
+    ok(r.status === 302 && r.headers.get('location') === '/', `link: HTTP ${r.status} -> ${r.headers.get('location')}`);
+    cookie = r.headers.get('set-cookie').split(';')[0];
+    const me = await api('GET', '/api/auth/me');
+    ok(me.json?.user?.email === EMAIL, `me: ${JSON.stringify(me.json)}`);
+    const again = await fetch(link, { redirect: 'manual' });
+    ok(again.status === 410, `link works twice: HTTP ${again.status}`);
+  });
+  await step('a wrong install key and a forwarded request are refused', async () => {
+    const body = JSON.stringify({ email: EMAIL, link: true });
+    const bad = await fetch(`${BASE}/api/auth/owner`, { method: 'POST', headers: { authorization: `Bearer ${'0'.repeat(64)}`, 'content-type': 'application/json' }, body });
+    ok(bad.status === 403, `wrong key: HTTP ${bad.status}`);
+    const secret = fs.readFileSync(path.join(DATA, 'secret.key'), 'utf8').trim();
+    const key = crypto.createHmac('sha256', secret).update('owner-login').digest('hex');
+    const fwd = await fetch(`${BASE}/api/auth/owner`, { method: 'POST', headers: { authorization: `Bearer ${key}`, 'x-forwarded-for': '203.0.113.9', 'content-type': 'application/json' }, body });
+    ok(fwd.status === 403, `forwarded request with the right key: HTTP ${fwd.status}`);
+  });
 
   let bot;
   await step('creating a bot starts its own Hermes gateway from the app-data folder', async () => {
@@ -137,7 +153,7 @@ try {
 
   await step('a gateway that crashes comes back', async () => {
     const home = path.join(DATA, 'engines', bot.id);
-    const url = `http://127.0.0.1:${ENGINE_BASE}`;
+    const url = `http://127.0.0.1:${ENGINE_BASE + 1}`; // the primary bot made at sign-in holds the first port
     const pidOf = async () => {
       const out = fs.readFileSync(path.join(home, 'logs', 'gateway.out.log'), 'utf8').trim().split('\n').filter(Boolean);
       return JSON.parse(out[out.length - 1]).pid;

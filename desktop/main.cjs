@@ -6,6 +6,7 @@ const fs = require('node:fs');
 const net = require('node:net');
 const path = require('node:path');
 const { ensureHermes } = require('./hermes.cjs');
+const { signInUrl } = require('./localauth.cjs');
 
 const SMOKE = process.argv.includes('--smoke');
 const trace = (m) => { if (SMOKE) console.log(`[smoke] ${m}`); };
@@ -103,7 +104,7 @@ async function smoke(url) {
     if (!['127.0.0.1', 'localhost'].includes(host) && !d.url.startsWith('file:') && !d.url.startsWith('devtools:')) outside.push(d.url);
     cb({});
   });
-  await win.loadURL(url);
+  await win.loadURL(await signInUrl(dirs().data, url));
   const end = Date.now() + 20_000;
   let drawn = false;
   while (!drawn && Date.now() < end) {
@@ -111,6 +112,8 @@ async function smoke(url) {
     if (!drawn) await sleep(250);
   }
   if (!drawn) throw new Error('the app page did not draw');
+  const me = await win.webContents.executeJavaScript(`fetch('/api/auth/me').then((r) => r.json())`);
+  if (me.user?.email !== 'me@localhost') throw new Error(`not signed in as the local user: ${JSON.stringify(me)}`);
   if (outside.length) throw new Error(`requests left this machine: ${outside.join(', ')}`);
   console.log(`SMOKE OK ${url}`);
 }
@@ -148,7 +151,7 @@ async function main() {
   // The page may only talk to its own server: navigation elsewhere opens the browser instead.
   win.webContents.on('will-navigate', (e, to) => { if (!to.startsWith(url) && !to.startsWith('file:')) { e.preventDefault(); if (/^https?:/.test(to)) shell.openExternal(to); } });
   if (SMOKE) return smoke(url);
-  await win.loadURL(url);
+  await win.loadURL(await signInUrl(dirs().data, url)); // single local user: no sign-in page
 }
 
 if (!app.requestSingleInstanceLock()) app.quit();
