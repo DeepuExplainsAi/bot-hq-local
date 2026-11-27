@@ -56,3 +56,22 @@ See `docs/local-audit.md` (c). Note `server/src/env.ts` currently requires XAI/C
 
 ## NEXT
 Part 1 (Electron shell). Keep CI to ONE run per part. Sandbox cannot run Electron/Chromium: verify via Actions (add an Electron smoke job on ubuntu with xvfb).
+
+
+## Part 1 (split: 1a server, 1b Electron shell)
+Split because one part would exceed ~15 files.
+
+### 1a: desktop mode of the server (`BOTHQ_LOCAL=1`) - this commit
+- `env.ts`: `LOCAL`, `BOTHQ_DATA` (data dir), `BOTHQ_WEB_DIST`; xAI/Composio/Orgo keys optional; session secret made once in `<data>/secret.key` (0600); listens on 127.0.0.1 only; Hermes shared home is `<data>/hermes-shared` (never `~/.hermes`).
+- `paths.ts`: library and profiles under `<data>`, not `/root/bothq`.
+- `engine.ts`: no "already running" primary agent; every bot gets its own app-managed Hermes home and gateway. Gateways are tracked, restarted on crash (2 s..60 s backoff), stopped on quit (`stopAllGateways`, taskkill /T on Windows). Child env is cross-platform.
+- `computer.ts`, `vnc.ts`: no Orgo calls; the computer is always "running"; the screen viewer returns a clear "arrives in step 3" error (not identical until Step 3).
+- `routes-config.ts`: library listing via Node `fs` (same JSON as `ls -la`), sign-in terminal opens an OS terminal (`local-terminal.ts`: Windows cmd, macOS Terminal, Linux terminal emulators).
+- `composio.ts`/`triggers.ts`: Composio SDK analytics and npm version check disabled in local mode; no event triggers until Step 4. (Found: the SDK phones home by default; Step 4 removes the SDK.)
+- `voice.ts`, `agent/tools.ts`: voice and `x_search` refuse without `XAI_API_KEY`, no xAI call.
+- `index.ts`: graceful quit via SIGTERM or IPC `'quit'`.
+- Tests: `tests/local/smoke.mjs` (+ `fake-hermes.mjs`), wired into `parity.yml`.
+- Verified in the sandbox (low memory needs swap in /tmp): `tsc --noEmit` clean, `tsc` build OK, `node tests/security.mjs` = 51 passed 0 failed, `node tests/local/smoke.mjs` = 11/11 passed. CI result: see below.
+
+### 1b: NEXT
+`desktop/` Electron main: free loopback port, fork the server with env above, wait for /api/health, BrowserWindow, quit handling; Hermes sidecar install (uv into app-data, progress screen, native Windows first, no silent WSL/Docker); Electron xvfb smoke job in CI. `better-sqlite3` must be rebuilt for Electron's ABI (electron-rebuild) in Step 5.
