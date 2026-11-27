@@ -38,6 +38,7 @@ The earlier billing block ("recent account payments have failed") only affected 
 | 4 | Composio -> local MCP servers, docs/local-tools.md, THIRD_PARTY.md | DONE (tag part-4-done) |
 | 5 | electron-builder + Actions matrix (win/mac/linux), installed-app smoke | DONE (tag part-5-done) |
 | 6 | Verification report (`docs/VERIFICATION.md`) | DONE (tag part-6-done) |
+| 7 | Real Hermes install + gateway health on Windows and macOS | DONE (tag part-7-done) |
 
 ## Part 0 details
 Files: `tests/parity/mock-api.mjs` (fixed-data API, `/__signed-out`, WS upgrades destroyed), `tests/parity/shoot.mjs` (Playwright 1440x900,
@@ -146,3 +147,10 @@ The earlier handoff said TODO because the previous AI ran out of credit before w
 - The previous AI's last open item (reviewing routines / owner-auth / routine creation) is covered by security.mjs (owner key, sign-in links, routine create/delete rules: all PASS) and verify step 5.
 - Report with the honest "not verified" list: `docs/VERIFICATION.md`. Audit updated (c) item 9.
 - ALL PARTS DONE. NEXT (user): try the installer from the installers run artifacts on a real laptop; the unproven item is real Hermes on native Windows. Open PR #1 stays draft.
+
+
+## Part 7 state (real Hermes on Windows and macOS) - DONE
+- Added `tests/local/hermes-real.mjs` and workflow `.github/workflows/hermes-real.yml` (windows-latest + macos-latest; push only when Hermes setup files change, or workflow_dispatch). It runs `ensureHermes` (desktop/hermes.cjs), starts a gateway like `engine.ts` does, checks `/health`, `/v1/models` (key accepted, wrong key 401), `~/.hermes` untouched.
+- One CI run (46021312124): Windows PASS (install 87 s, health at 101 s), macOS PASS (23 s / 31 s). Native Windows Hermes works, so no fallback is needed (and none was added). Details in `docs/VERIFICATION.md`.
+- Still unproven: real model turns, the hq MCP link and the bot browser (cdp_url) under real Hermes on Windows/macOS; installer UIs; signing.
+- NEXT (user): install an artifact from the installers run on a laptop and chat with a real key.

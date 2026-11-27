@@ -16,8 +16,19 @@ Runs: parity 46002262087, desktop 46002262143, installers 46002262031 (all green
 | 9 | No secrets in git history | PASS | gitleaks 8.30.1, 54 commits, "no leaks found" (parity job) |
 | 10 | Typecheck, build, security tests, UI parity | PASS | parity job: typecheck, build, security 51/51, smoke 28/28, verify 7/7, screenshots match |
 
+## Part 7: real Hermes, no model (workflow `hermes-real`, run 46021312124)
+`tests/local/hermes-real.mjs` runs the real first-run install from `desktop/hermes.cjs` (uv 0.13.10 -> Python 3.14 -> Hermes v0.23.4, into a temp app-data folder), writes a bot home (`.env`, `config.yaml`), starts `hermes gateway run --no-supervise` with the same command and environment as `server/src/engine.ts`, and checks the gateway. No API key, no model call, no WSL2, no Docker.
+
+| OS (GitHub runner) | Install | Gateway `/health` | `/v1/models` right key / wrong key | `~/.hermes` untouched |
+|---|---|---|---|---|
+| Windows (native, windows-latest) | PASS, 87 s | PASS (`{"status":"ok","platform":"hermes-agent"}`) at 101 s | 200 / 401 | PASS |
+| macOS (Apple silicon, macos-latest) | PASS, 23 s | PASS at 31 s | 200 / 401 | PASS |
+| Linux (ubuntu) | PASS (`hermes` job in `desktop.yml`: install, `--version`, `gateway --help`) | not run by this test | - | PASS |
+
+Limits: the test starts the gateway itself (same command and env as the server) rather than through the server's engine code, and it never calls a model, so tool use, the `hq` MCP link and the bot browser under real Hermes on Windows/macOS are still unproven. The server ran on Linux only (fake Hermes).
+
 ## Not verified (honest list)
-- Real Hermes on native Windows/macOS/Linux with a model: CI uses a fake `hermes` for chat and routines. The first-run Hermes install (uv, `desktop/`) is only exercised on ubuntu with `HERMES_HOME` set. Native Windows Hermes is therefore **unproven**; per the brief, if it turns out unreliable, report and wait (no WSL2/Docker fallback).
+- A real model turn through real Hermes (needs a user's key or subscription); the bot browser driven by real Hermes (`cdp_url`).
 - The installer UIs themselves (.exe NSIS wizard, .dmg drag, .deb install): CI starts the unpacked app from the same build, it does not run the installers.
 - macOS Intel build (only Apple silicon is built). Installers are unsigned (SmartScreen / Gatekeeper warn).
 - Event routines, Gmail/Calendar/Drive, hosted sandbox: not available locally (see `docs/local-audit.md` (c)).
