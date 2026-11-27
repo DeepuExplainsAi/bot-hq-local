@@ -54,6 +54,7 @@ jobs:
       - name: It runs from the app-data folder and leaves ~/.hermes alone
         run: |
           BIN=/tmp/bothq-hermes/venv/bin/hermes
-          HERMES_HOME=/tmp/bothq-hermes/check "$BIN" --version
+          export HERMES_HOME=/tmp/bothq-hermes/check
+          "$BIN" --version
           "$BIN" gateway --help | head -5
           test ! -e "$HOME/.hermes" && echo "~/.hermes untouched"

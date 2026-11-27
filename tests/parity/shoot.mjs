@@ -14,6 +14,13 @@ const failures = [];
 
 async function page(scheme) {
   const ctx = await browser.newContext({ viewport: { width: 1440, height: 900 }, colorScheme: scheme, reducedMotion: 'reduce' });
+  // No network in a screenshot run: app logos come from a stub, anything else off this machine is refused.
+  // (Otherwise a slow logo server changes the picture from run to run.)
+  await ctx.route((url) => !['localhost', '127.0.0.1'].includes(url.hostname), (route) => (
+    route.request().resourceType() === 'image'
+      ? route.fulfill({ contentType: 'image/svg+xml', body: '<svg xmlns="http://www.w3.org/2000/svg" width="40" height="40"><rect width="40" height="40" rx="8" fill="#6b4fbb"/></svg>' })
+      : route.abort()
+  ));
   const p = await ctx.newPage();
   p.setDefaultTimeout(15000);
   p.on('console', (m) => m.type() === 'error' && console.log('console.error:', m.text().slice(0, 200)));
