@@ -1,6 +1,7 @@
-import { execFile, spawn } from 'node:child_process';
+import { execFile, spawn, type ChildProcess } from 'node:child_process';
 import crypto from 'node:crypto';
 import fs from 'node:fs';
+import os from 'node:os';
 import path from 'node:path';
 import YAML from 'yaml';
 import { displayFor } from './box.js';
@@ -95,6 +96,8 @@ function freePort(): number {
  * does not count: the owner key also lets guests in.
  */
 export function mayUsePrimary(userId: string): boolean {
+  // The desktop app has no agent that was already running: every bot gets a Hermes home of its own, inside the app's data folder.
+  if (env.local) return false;
   const email = String((db.prepare('SELECT email FROM users WHERE id=?').get(userId) as any)?.email ?? '').toLowerCase();
   return env.ownerEmail ? email === env.ownerEmail : env.localOnly;
 }
@@ -170,7 +173,8 @@ async function writeHome(botId: string): Promise<{ home: string; key: string; di
   // Its screen decides which display and which Chrome it drives. Only meaningful on the computer itself.
   let display: string | null = null;
   let cdp = '';
-  if (env.localBox) {
+  // (Desktop mode: the bot's browser is wired in by the desktop shell, not by an X display.)
+  if (env.localBox && !env.local) {
     try {
       const s = await screenFor(b.user_id, botId);
       display = displayFor(s.screenId);
@@ -263,20 +267,46 @@ function gatewayPid(home: string): number | null {
   return pid;
 }
 
+/** Gateways this server started in desktop mode, so they can be restarted when they crash and stopped on quit. */
+const running = new Map<string, ChildProcess>();
+const stopping = new Set<string>();
+const restartDelay = new Map<string, number>();
+
+/** Stop a process and everything it started (Windows has no process groups to signal). */
+function killTree(pid: number, force: boolean) {
+  if (process.platform === 'win32') {
+    execFile('taskkill', ['/pid', String(pid), '/T', ...(force ? ['/F'] : [])], () => {});
+    return;
+  }
+  const sig = force ? 'SIGKILL' : 'SIGTERM';
+  try { process.kill(-pid, sig); } catch { try { process.kill(pid, sig); } catch { /* gone */ } }
+}
+
+const isAlive = (pid: number) => { try { process.kill(pid, 0); return true; } catch { return false; } };
+
 async function stopGateway(botId: string) {
   const home = homeFor(botId);
-  const pid = gatewayPid(home);
+  const mine = running.get(botId);
+  const pid = mine?.pid ?? gatewayPid(home);
   if (!pid) return;
-  const signal = (sig: NodeJS.Signals) => {
-    try { process.kill(-pid, sig); } catch { try { process.kill(pid, sig); } catch { /* gone */ } }
-  };
-  signal('SIGTERM');
-  for (let i = 0; i < 40; i++) {
-    await new Promise((r) => setTimeout(r, 250));
-    try { process.kill(pid, 0); } catch { return; }
+  stopping.add(botId);
+  try {
+    killTree(pid, false);
+    for (let i = 0; i < 40; i++) {
+      await new Promise((r) => setTimeout(r, 250));
+      if (!isAlive(pid)) return;
+    }
+    killTree(pid, true);
+    await new Promise((r) => setTimeout(r, 300));
+  } finally {
+    running.delete(botId);
+    stopping.delete(botId);
   }
-  signal('SIGKILL');
-  await new Promise((r) => setTimeout(r, 300));
+}
+
+/** Desktop mode: stop every gateway this server started (called when the app quits). */
+export async function stopAllGateways() {
+  await Promise.all([...running.keys()].map((id) => stopGateway(id)));
 }
 
 const starting = new Map<string, Promise<void>>();
@@ -314,16 +344,19 @@ async function startGateway(botId: string): Promise<void> {
   if (gatewayPid(home)) await stopGateway(botId);
 
   const log = fs.openSync(path.join(home, 'logs', 'gateway.out.log'), 'a');
+  const win = process.platform === 'win32';
   const child = spawn(env.hermesBin, ['gateway', 'run', '--no-supervise'], {
     cwd: home,
-    detached: true,
+    detached: !win, // its own process group, so the whole tree can be stopped (Windows: taskkill /T)
+    windowsHide: true,
     stdio: ['ignore', log, log],
     // Only what the agent needs. None of this server's secrets, and nothing of the primary agent's messaging.
     env: {
-      PATH: process.env.PATH ?? '/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin',
-      HOME: process.env.HOME ?? '/root',
-      USER: process.env.USER ?? 'root',
+      PATH: [process.env.BOTHQ_EXTRA_PATH, process.env.PATH ?? '/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin'].filter(Boolean).join(path.delimiter),
+      HOME: process.env.HOME ?? os.homedir(),
+      USER: process.env.USER ?? os.userInfo().username,
       LANG: process.env.LANG ?? 'C.UTF-8',
+      ...(win ? Object.fromEntries(['SystemRoot', 'USERPROFILE', 'APPDATA', 'LOCALAPPDATA', 'TEMP', 'TMP', 'ComSpec', 'PATHEXT', 'PYTHONUTF8'].filter((k) => process.env[k]).map((k) => [k, process.env[k]!])) : {}),
       HERMES_HOME: home,
       HERMES_GATEWAY_LOCK_DIR: path.join(home, 'locks'),
       // Hermes' browser tool talks to a helper process it finds under this folder. With the default
@@ -335,13 +368,27 @@ async function startGateway(botId: string): Promise<void> {
   fs.closeSync(log);
   let exited: string | null = null;
   child.once('error', (e) => { exited = `could not run ${env.hermesBin}: ${e.message}`; });
-  child.once('exit', (code) => { exited = `the agent stopped while starting (exit ${code}). See ${path.join(home, 'logs', 'gateway.out.log')}`; });
-  child.unref();
+  let up = false;
+  child.once('exit', (code) => {
+    exited = `the agent stopped while starting (exit ${code}). See ${path.join(home, 'logs', 'gateway.out.log')}`;
+    if (running.get(botId) === child) running.delete(botId);
+    // Desktop mode: the app owns the gateways, so one that dies after it was up comes back (backoff 2 s .. 60 s).
+    if (env.local && up && !stopping.has(botId) && botRow(botId)) {
+      const wait = restartDelay.get(botId) ?? 2000;
+      restartDelay.set(botId, Math.min(wait * 2, 60_000));
+      console.warn(`[engine] ${b.name}: gateway exited (code ${code}); restarting in ${wait / 1000}s`);
+      setTimeout(() => { if (!stopping.has(botId) && botRow(botId)) provisionEngine(botId); }, wait).unref();
+    }
+  });
+  if (env.local) running.set(botId, child);
+  else child.unref();
 
   for (let i = 0; i < 90; i++) {
     await new Promise((r) => setTimeout(r, 1000));
     if (exited) throw new Error(exited);
     if (await healthy(url, 1500)) {
+      up = true;
+      setTimeout(() => restartDelay.delete(botId), 120_000).unref(); // stable for two minutes: forget the backoff
       console.log(`[engine] ${b.name}: gateway up on ${url}`);
       return;
     }

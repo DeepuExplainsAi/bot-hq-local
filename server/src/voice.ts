@@ -43,6 +43,7 @@ export const SPEEDS = [0.7, 0.85, 1, 1.15, 1.3, 1.5];
 
 let voiceCache: { at: number; voices: VoiceOption[] } | null = null;
 async function listVoices(): Promise<VoiceOption[]> {
+  if (!env.xaiKey) return FALLBACK_VOICES; // voice is off without the user's own key: no call to xAI
   if (voiceCache && Date.now() - voiceCache.at < 3600_000) return voiceCache.voices;
   try {
     const r = await fetch(`${XAI}/tts/voices`, { headers: xaiHeaders(), signal: AbortSignal.timeout(8000) });
@@ -224,6 +225,12 @@ const fmtDuration = (ms: number) => {
   return s < 60 ? `${s}s` : `${Math.floor(s / 60)}m ${String(s % 60).padStart(2, '0')}s`;
 };
 
+// Voice runs on xAI with the user's own key. Without one every voice call is refused here, before anything leaves the machine.
+voiceApi.use('*', async (c, next) => {
+  if (!env.xaiKey && !c.req.path.endsWith('/options')) return c.json({ error: 'Voice needs your own xAI key. Add XAI_API_KEY in the app settings to turn it on.' }, 409);
+  await next();
+});
+
 voiceApi.get('/options', async (c) => c.json({ voices: await listVoices(), languages: LANGUAGES, speeds: SPEEDS }));
 
 voiceApi.post('/session', async (c) => {
@@ -346,7 +353,8 @@ voiceApi.post('/tool', async (c) => {
   }
 });
 
-const xai = new OpenAI({ apiKey: env.xaiKey, baseURL: XAI, timeout: 45_000 });
+const xai = new OpenAI({ apiKey: env.xaiKey || 'unset', // never used without a key: see the guard above
+   baseURL: XAI, timeout: 45_000 });
 
 async function summarizeCall(botName: string, transcript: { role: string; text: string }[], tasks: string[]): Promise<string | null> {
   if (!transcript.length && !tasks.length) return null;

@@ -4,7 +4,13 @@ import { db } from './db.js';
 import { env } from './env.js';
 import type { Toolkit } from './types.js';
 
-export const composio = new Composio({ apiKey: env.composioKey, provider: new OpenAIResponsesProvider() });
+// Desktop mode never calls Composio (step 4 removes it): the placeholder key only lets the SDK object exist, and the
+// SDK's own usage analytics and npm version check, which would be outbound calls, are off.
+export const composio = new Composio({
+  apiKey: env.composioKey || 'local-unused',
+  provider: new OpenAIResponsesProvider(),
+  ...(env.local ? { allowTracking: false, disableVersionCheck: true } : {}),
+});
 
 const REST = 'https://backend.composio.dev/api/v3.1';
 async function rest<T = any>(path: string): Promise<T> {

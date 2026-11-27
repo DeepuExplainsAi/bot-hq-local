@@ -1,6 +1,7 @@
 import type { IncomingMessage, Server } from 'node:http';
 import { WebSocket, WebSocketServer } from 'ws';
 import { db } from './db.js';
+import { env } from './env.js';
 import { isSameOriginRequest, userFromCookieHeader } from './lib/auth.js';
 import { vncAuthResponse } from './lib/des.js';
 import { orgo } from './orgo.js';
@@ -165,6 +166,7 @@ async function relay(client: WebSocket, userId: string, botId: string, mode: 'wa
   viewerOpened(userId); // keeps the computer awake while someone is watching (see idle.ts)
 
   try {
+    if (env.local) throw new Error('The bot screen viewer for the desktop app arrives in step 3.');
     const { computerId, screenId } = await screenFor(userId, botId);
     // A screen nobody has used yet is bare; set it up while the person is already watching.
     readyScreen(userId, botId).catch(() => {});

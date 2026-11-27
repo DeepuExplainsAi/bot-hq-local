@@ -1,4 +1,5 @@
 import { db, now } from './db.js';
+import { env } from './env.js';
 import { composio } from './composio.js';
 import { appendRow } from './store.js';
 
@@ -23,6 +24,7 @@ function migrate() {
 export async function initTriggers(enqueue: (botId: string, t: any) => void) {
   migrate();
   enqueueFn = enqueue;
+  if (env.local) return; // event routines need Composio's realtime feed; local triggers come with step 4
   const count = (db.prepare("SELECT COUNT(*) n FROM routines WHERE schedule LIKE 'event:%'").get() as any).n;
   if (count > 0) await ensureSubscribed();
   console.log(`[triggers] ${count} event routine(s)`);

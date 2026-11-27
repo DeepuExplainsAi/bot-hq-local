@@ -24,6 +24,10 @@ jobs:
       - run: npm ci
       - run: npm run typecheck
       - run: npm run build
+      - name: Existing security tests
+        run: node tests/security.mjs
+      - name: Desktop-mode smoke test
+        run: node tests/local/smoke.mjs
       - name: Playwright browsers cache
         id: pw
         uses: actions/cache@v4
