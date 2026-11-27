@@ -31,7 +31,7 @@ jobs:
       - run: npm ci --ignore-scripts
       - run: npm run build
       - run: node scripts/stage-desktop.mjs
-      - run: npm ci --ignore-scripts
+      - run: npm ci
         working-directory: desktop
       - run: npx electron-builder
         working-directory: desktop
