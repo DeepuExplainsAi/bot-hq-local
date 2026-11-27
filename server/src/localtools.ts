@@ -1,7 +1,7 @@
 import crypto from 'node:crypto';
 import fs from 'node:fs';
-import { createRequire } from 'node:module';
 import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { getDefaultEnvironment, StdioClientTransport } from '@modelcontextprotocol/sdk/client/stdio.js';
 import { env } from './env.js';
@@ -45,7 +45,6 @@ const DEFS: Def[] = [
     pkg: '@tacticlaunch/mcp-linear', bin: 'dist/index.js' },
 ];
 const def = (slug: string) => DEFS.find((d) => d.slug === slug);
-const require = createRequire(import.meta.url);
 
 // ---------------------------------------------------------------- the user's tokens: one encrypted file
 
@@ -82,9 +81,13 @@ interface Running { client: Client; tools: { name: string; real: string; descrip
 const running = new Map<string, Promise<Running>>();
 const id = (userId: string, slug: string) => `${userId}\0${slug}`;
 
+/** The start file of a tool server: found by walking up the node_modules folders (a package's `exports` may hide its package.json from require). */
 function binPath(d: Def): string {
-  const dir = path.dirname(require.resolve(`${d.pkg}/package.json`));
-  return path.join(dir, d.bin);
+  for (let dir = path.dirname(fileURLToPath(import.meta.url)); ; dir = path.dirname(dir)) {
+    const file = path.join(dir, 'node_modules', d.pkg, d.bin);
+    if (fs.existsSync(file)) return file;
+    if (dir === path.dirname(dir)) throw new Error(`${d.name} is not installed (${d.pkg})`);
+  }
 }
 
 async function start(d: Def, values: Record<string, string>): Promise<Running> {
