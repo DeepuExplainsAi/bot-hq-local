@@ -48,6 +48,7 @@ const showStatus = (text, error = false) => {
 function startServer(port, hermesBin) {
   const { data, logs } = dirs();
   fs.mkdirSync(logs, { recursive: true });
+  fs.mkdirSync(data, { recursive: true }); // the server's working folder
   const log = fs.openSync(path.join(logs, 'server.log'), 'a');
   const url = `http://127.0.0.1:${port}`;
   // Only what the server needs. Cloud keys are never passed; XAI_API_KEY is the user's own optional key.
@@ -63,10 +64,13 @@ function startServer(port, hermesBin) {
   };
   server = spawn(process.execPath, [path.join(ROOT, 'server', 'dist', 'index.js')], { cwd: data, env, stdio: ['ignore', log, log, 'ipc'], windowsHide: true });
   fs.closeSync(log);
+  server.once('error', (e) => { console.error(`server: ${e.message}`); });
   server.once('exit', (code) => {
     server = null;
     if (quitting) return;
-    dialog.showErrorBox('Bot HQ stopped', `The Bot HQ server exited (code ${code}). See ${path.join(logs, 'server.log')}.`);
+    const message = `The Bot HQ server exited (code ${code}). See ${path.join(logs, 'server.log')}.`;
+    if (SMOKE) console.error(`${message}\n${fs.readFileSync(path.join(logs, 'server.log'), 'utf8')}`);
+    else dialog.showErrorBox('Bot HQ stopped', message); // a modal box would hang a CI run
     app.exit(1);
   });
   return url;
