@@ -8,6 +8,8 @@ import { hub } from './lib/hub.js';
 import { createSession, destroySession, isLocalRequest, isOwnerKey, peerAddress, rateLimit, requireUser, userFromCookieHeader, type AuthVars } from './lib/auth.js';
 import { allLive, appendRow, clearConversation, emitBot, getBot, getBotRow, getRow, listBots, listRoutines, listRows, listTasks, toRoutine, updateRow } from './store.js';
 import { enqueue, interrupt, resolveApproval } from './agent/loop.js';
+import { captureBotScreen } from './cdpscreen.js';
+import { browsersAvailable } from './botbrowser.js';
 import { computerState, ensureComputer, forgetBotFiles, readyScreen, refreshComputer, releaseScreen, suspendComputer } from './computer.js';
 import { assignEngine, provisionEngine, removeEngine, syncPersona } from './engine.js';
 import { deleteMemory, listMemories, memoryBot } from './engine-memory.js';
@@ -468,6 +470,10 @@ api.get('/bots/:id/screenshot', async (c) => {
   const b = ownBot(user.id, c.req.param('id'));
   if (!b) return c.json({ error: 'not found' }, 404);
   const scr = db.prepare('SELECT screen_id FROM screens WHERE bot_id=?').get(b.id) as any;
+  if (env.local) {
+    if (!browsersAvailable() || !scr) return c.body(null, 204);
+    try { return c.body(await captureBotScreen(b.id), 200, { 'Content-Type': 'image/jpeg', 'Cache-Control': 'no-store' }); } catch { return c.body(null, 204); }
+  }
   if (!env.orgoComputerId || computerState(user.id).status !== 'running' || !scr) return c.body(null, 204);
   try {
     const s = await orgo.screenshot(env.orgoComputerId, scr.screen_id);

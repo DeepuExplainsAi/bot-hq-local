@@ -5,6 +5,7 @@ import { orgo, OrgoError, type OrgoScreen } from './orgo.js';
 import { cdpPortFor, dressScreen, resetScreen, undressScreen, type DeskBot } from './desk.js';
 import { box } from './box.js';
 import fs from 'node:fs/promises';
+import { browsersAvailable, ensureBotBrowser, stopBotBrowser } from './botbrowser.js';
 import { libraryRoot, profilesRoot } from './paths.js';
 import type { ComputerState } from './types.js';
 
@@ -230,7 +231,11 @@ export function cdpUrlFor(botId: string, screenId: string): string {
  * answers. Without this a bot's first turn finds no browser and goes off to start one of its own.
  */
 export async function screenForWork(userId: string, botId: string): Promise<void> {
-  if (env.local || !env.orgoComputerId) return;
+  if (env.local) {
+    if (browsersAvailable()) await ensureBotBrowser(botId).catch((e) => console.warn(`[computer] no browser for ${botId}: ${e?.message ?? e}`));
+    return;
+  }
+  if (!env.orgoComputerId) return;
   if (!managesChrome(botId)) {
     // It brings its own browser, so nothing it needs depends on the dressing: don't make it wait.
     void readyScreen(userId, botId).catch((e) => console.warn(`[computer] screen not ready for ${botId}: ${e?.message ?? e}`));
@@ -252,6 +257,7 @@ export async function resetBotScreen(userId: string, botId: string): Promise<voi
 
 /** The bot is gone: stop what we ran on its screen and free the screen for the next bot. */
 export async function releaseScreen(botId: string): Promise<void> {
+  if (env.local) await stopBotBrowser(botId); // it may run without the bot ever having opened its screen
   const mine = db.prepare('SELECT screen_id, user_id FROM screens WHERE bot_id=?').get(botId) as any;
   if (!mine) return;
   db.prepare('DELETE FROM screens WHERE bot_id=?').run(botId);

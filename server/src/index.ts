@@ -20,6 +20,7 @@ import { configApi } from './routes-config.js';
 import { startIdleWatcher } from './idle.js';
 import { mcpApi } from './mcp.js';
 import { initEngines, stopAllGateways } from './engine.js';
+import { stopAllBrowsers } from './botbrowser.js';
 import { sameOriginWrites } from './lib/auth.js';
 import { resolveBoxData } from './paths.js';
 
@@ -61,7 +62,7 @@ if (fs.existsSync(webDist)) {
 const server = serve({ fetch: app.fetch, port: env.port, hostname: env.host }, (info) => console.log(`[bothq] server on http://localhost:${info.port} (listening on ${env.host ?? 'every interface'})`))
 // The desktop shell asks the server to stop; the agents it started go down with it.
 if (env.local) {
-  const quit = () => void stopAllGateways().finally(() => process.exit(0));
+  const quit = () => void Promise.all([stopAllGateways(), stopAllBrowsers()]).finally(() => process.exit(0));
   process.on('SIGTERM', quit);
   process.on('SIGINT', quit);
   process.on('message', (m) => { if (m === 'quit') quit(); });

@@ -129,6 +129,8 @@ export const env = {
    * (e.g. http://127.0.0.1:9333). When set, we never start or stop that screen's Chrome ourselves.
    */
   primaryCdpUrl: process.env.PRIMARY_CDP_URL ?? '',
+  /** Desktop mode: how to start one bot's browser (JSON {exe, args}, set by the desktop shell). Empty = no bot browsers. */
+  browserCmd: LOCAL ? process.env.BOTHQ_BROWSER_CMD ?? '' : '',
   /** Bots that can each have a screen (Orgo allows four screens on one Linux computer). */
   maxBots: Number(process.env.MAX_BOTS ?? 4),
   /**

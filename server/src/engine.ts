@@ -6,6 +6,7 @@ import path from 'node:path';
 import YAML from 'yaml';
 import { displayFor } from './box.js';
 import { cdpUrlFor, screenFor } from './computer.js';
+import { browsersAvailable, ensureBotBrowser } from './botbrowser.js';
 import { db } from './db.js';
 import { env } from './env.js';
 import { libraryRoot } from './paths.js';
@@ -173,8 +174,10 @@ async function writeHome(botId: string): Promise<{ home: string; key: string; di
   // Its screen decides which display and which Chrome it drives. Only meaningful on the computer itself.
   let display: string | null = null;
   let cdp = '';
-  // (Desktop mode: the bot's browser is wired in by the desktop shell, not by an X display.)
-  if (env.localBox && !env.local) {
+  // Desktop mode: the bot's own browser (no X display); Hermes drives it over DevTools.
+  if (env.local && browsersAvailable()) {
+    try { cdp = await ensureBotBrowser(botId); } catch (e: any) { console.warn(`[engine] no browser for ${b.name} yet: ${e?.message ?? e}`); }
+  } else if (env.localBox && !env.local) {
     try {
       const s = await screenFor(b.user_id, botId);
       display = displayFor(s.screenId);

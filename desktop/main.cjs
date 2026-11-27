@@ -8,6 +8,9 @@ const path = require('node:path');
 const { ensureHermes } = require('./hermes.cjs');
 const { signInUrl } = require('./localauth.cjs');
 
+// A bot's browser is this same program started again (see server/src/botbrowser.ts): it only shows a window.
+if (process.env.BOTHQ_BROWSER_HOST === '1') { require('./botbrowser.cjs'); return; }
+
 const SMOKE = process.argv.includes('--smoke');
 const trace = (m) => { if (SMOKE) console.log(`[smoke] ${m}`); };
 const ROOT = process.env.BOTHQ_ROOT || path.resolve(__dirname, '..'); // the folder holding server/ and web/
@@ -53,13 +56,15 @@ function startServer(port, hermesBin) {
   const log = fs.openSync(path.join(logs, 'server.log'), 'a');
   const url = `http://127.0.0.1:${port}`;
   // Only what the server needs. Cloud keys are never passed; XAI_API_KEY is the user's own optional key.
-  const pass = ['PATH', 'HOME', 'USER', 'USERPROFILE', 'APPDATA', 'LOCALAPPDATA', 'TEMP', 'TMP', 'SystemRoot', 'ComSpec', 'PATHEXT', 'LANG', 'XAI_API_KEY'];
+  const pass = ['PATH', 'HOME', 'USER', 'USERPROFILE', 'APPDATA', 'LOCALAPPDATA', 'TEMP', 'TMP', 'SystemRoot', 'ComSpec', 'PATHEXT', 'LANG', 'XAI_API_KEY', 'DISPLAY', 'WAYLAND_DISPLAY', 'XDG_RUNTIME_DIR', 'XAUTHORITY', 'DBUS_SESSION_BUS_ADDRESS'];
   const env = {
     ...Object.fromEntries(pass.filter((k) => process.env[k]).map((k) => [k, process.env[k]])),
     ELECTRON_RUN_AS_NODE: '1',
     BOTHQ_LOCAL: '1',
     BOTHQ_DATA: data,
     BOTHQ_WEB_DIST: path.join(ROOT, 'web', 'dist'),
+    // How the server starts a bot's browser: this same program again (see botbrowser.cjs).
+    BOTHQ_BROWSER_CMD: JSON.stringify({ exe: process.execPath, args: [...(app.isPackaged ? [] : [__dirname]), ...(process.argv.includes('--no-sandbox') ? ['--no-sandbox'] : [])] }),
     PORT: String(port), APP_URL: url, SERVER_URL: url, MCP_BASE_URL: url,
     ...(hermesBin ? { HERMES_BIN: hermesBin, BOTHQ_EXTRA_PATH: path.dirname(hermesBin) } : {}),
   };
@@ -114,6 +119,17 @@ async function smoke(url) {
   if (!drawn) throw new Error('the app page did not draw');
   const me = await win.webContents.executeJavaScript(`fetch('/api/auth/me').then((r) => r.json())`);
   if (me.user?.email !== 'me@localhost') throw new Error(`not signed in as the local user: ${JSON.stringify(me)}`);
+  // The real thing: the primary bot's own browser (a second Electron process) shows up in the viewer as RFB + Tight JPEG.
+  const { rfbProbe } = require(path.join(ROOT, 'tests', 'local', 'rfb-client.cjs'));
+  const shot = await win.webContents.executeJavaScript(`(async () => {
+    const bot = (await (await fetch('/api/bots')).json()).bots[0];
+    const ws = new WebSocket((location.protocol === 'https:' ? 'wss' : 'ws') + '://' + location.host + '/api/bots/' + bot.id + '/screen?mode=watch', ['binary']);
+    const r = await (${rfbProbe.toString()})(ws);
+    ws.close();
+    return r;
+  })()`);
+  if (shot.encoding !== 7 || shot.ctl !== 0x90 || shot.jpegStart[0] !== 0xff || shot.width < 400) throw new Error(`bot browser picture: ${JSON.stringify(shot)}`);
+  console.log(`BOT BROWSER OK ${shot.width}x${shot.height}, ${shot.jpegLen} bytes of JPEG`);
   if (outside.length) throw new Error(`requests left this machine: ${outside.join(', ')}`);
   console.log(`SMOKE OK ${url}`);
 }
