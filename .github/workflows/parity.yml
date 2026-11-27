@@ -40,9 +40,13 @@ jobs:
           BOTHQ_API=http://127.0.0.1:8799 npm run dev -w web > vite.log 2>&1 &
           npx --yes wait-on http://localhost:5173 http://127.0.0.1:8799/api/health --timeout 60000
       - name: Screenshots
+        timeout-minutes: 5
         run: node tests/parity/shoot.mjs docs/parity-new
       - name: Compare with baselines
         run: node tests/parity/compare.mjs docs/parity docs/parity-new
+      - name: Server log
+        if: always()
+        run: tail -30 vite.log || true
       - uses: actions/upload-artifact@v4
         if: always()
         with: { name: parity-screenshots, path: docs/parity-new }

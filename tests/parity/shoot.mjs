@@ -9,11 +9,15 @@ const mock = process.env.MOCK_URL ?? 'http://127.0.0.1:8799';
 fs.mkdirSync(out, { recursive: true });
 
 const browser = await chromium.launch();
+setTimeout(() => { console.log('GLOBAL TIMEOUT after 180s'); process.exit(2); }, 180_000);
 const failures = [];
 
 async function page(scheme) {
   const ctx = await browser.newContext({ viewport: { width: 1440, height: 900 }, colorScheme: scheme, reducedMotion: 'reduce' });
   const p = await ctx.newPage();
+  p.setDefaultTimeout(15000);
+  p.on('console', (m) => m.type() === 'error' && console.log('console.error:', m.text().slice(0, 200)));
+  p.on('requestfailed', (r) => console.log('requestfailed:', r.url().slice(0, 120)));
   p.on('pageerror', (e) => failures.push(`pageerror: ${e.message}`));
   return p;
 }
@@ -29,8 +33,10 @@ async function step(name, fn) {
 
 for (const scheme of ['light', 'dark']) {
   await fetch(`${mock}/__signed-in`);
+  console.log('start', scheme);
   const p = await page(scheme);
-  await p.goto(`${base}/?fixtures=idle`);
+  console.log('goto', scheme);
+  await p.goto(`${base}/?fixtures=idle`, { waitUntil: 'domcontentloaded' });
   await p.getByLabel('Search').first().waitFor({ timeout: 20000 });
   await shot(p, `chat-${scheme}`);
   await step('search', async () => { await p.getByLabel('Search').first().click(); await shot(p, `search-${scheme}`); await p.keyboard.press('Escape'); });
@@ -44,7 +50,7 @@ for (const scheme of ['light', 'dark']) {
 // Signed-out page.
 await fetch(`${mock}/__signed-out`);
 const so = await page('light');
-await so.goto(base);
+await so.goto(base, { waitUntil: 'domcontentloaded' });
 await so.waitForTimeout(1500);
 await shot(so, 'sign-in');
 await fetch(`${mock}/__signed-in`);
