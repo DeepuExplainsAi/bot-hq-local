@@ -36,8 +36,8 @@ The earlier billing block ("recent account payments have failed") only affected 
 | 3a | Bot browser per bot (Electron Chromium process), RFB-over-CDP viewer, Hermes `cdp_url`, preview screenshot | DONE (tag part-3a-done) |
 | 3b | Home (new-tab) page port, reset screen, deterministic viewer frame in the mock + refreshed baselines | DONE (tag part-3-done) |
 | 4 | Composio -> local MCP servers, docs/local-tools.md, THIRD_PARTY.md | DONE (tag part-4-done) |
-| 5 | electron-builder + Actions matrix (win/mac/linux) | TODO |
-| 6 | Verification report | TODO |
+| 5 | electron-builder + Actions matrix (win/mac/linux), installed-app smoke | DONE (tag part-5-done) |
+| 6 | Verification report | IN PROGRESS |
 
 ## Part 0 details
 Files: `tests/parity/mock-api.mjs` (fixed-data API, `/__signed-out`, WS upgrades destroyed), `tests/parity/shoot.mjs` (Playwright 1440x900,
@@ -128,3 +128,13 @@ Split of part 3 (>15 files): 3a = the plumbing below; 3b = look of the bot brows
 - Sandbox: `tsc` clean, `node tests/local/smoke.mjs` 28/28 (7 new steps: catalog, form page, token check, token only in encrypted file, approval card on an action and decline, event routines message, disconnect). Electron smoke gained `APP SERVER OK`.
 - CI (runs 45998562733 desktop, 45998562677 parity, both green): security 51/51, smoke 28/28, Electron `APP SERVER OK` + `BOT BROWSER OK` + `SMOKE OK`, screenshots match.
 - NEXT: Part 5 (electron-builder installers: Windows .exe, macOS .dmg, Linux .AppImage/.deb; electron-rebuild for better-sqlite3; the app's server dependencies and the tool servers must be inside the package).
+
+
+## Part 5 state (installers) - corrected 2026-11-27 against git and Actions
+The earlier handoff said TODO because the previous AI ran out of credit before writing this section. Real state:
+- Commits: `4977cab` electron-builder config (`desktop/package.json`), `scripts/stage-desktop.mjs` (stages the built server + web + tool servers), `.github/workflows/installers.yml` (Windows nsis, macOS arm64 dmg, Linux AppImage + deb); fixes `1623acd` (skip native build scripts on install, no `timeout` on macOS/Windows), `a5943a4` (desktop install keeps electron's download script), `453de19` (ship the smoke probe, judge the installed app by its output), `2047df3` (`localtools.ts`: find a tool server's start file by walking node_modules, works inside the installed app).
+- Failed runs before: installers red on `4977cab`..`453de19` (build-script, timeout(1), missing probe file, tool-server lookup in the packaged app). All fixed by `2047df3`.
+- Runs on `2047df3` (all green): installers 46000717812 (Windows, macOS arm64, Linux: build, installed app `--smoke` prints `SMOKE OK`, `BOT BROWSER OK`, `APP SERVER OK`, no request left the machine, LICENSE + THIRD_PARTY.md + THIRD_PARTY_NOTICES.md inside the package, installer uploaded as artifact), parity 46000717551, desktop 46000717536.
+- Installers are unsigned (macOS Gatekeeper / Windows SmartScreen warn on first start). macOS build is Apple silicon only.
+- Not yet run by me: the installers themselves on a real laptop. CI starts the unpacked app, not the .exe/.dmg/.deb installer UI.
+- NEXT: Part 6 (verification report). Items still missing a test: chat turn through the gateway, routine creation + scheduler run, restart keeps data, gitleaks re-scan.
