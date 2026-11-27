@@ -31,7 +31,7 @@ The earlier billing block ("recent account payments have failed") only affected 
 |---|---|---|
 | 0 | PARITY.md, mock API, screenshot workflow, baselines | DONE (tag part-0-done) |
 | 1a | Server desktop mode (`BOTHQ_LOCAL=1`) | DONE (tag part-1a-done) |
-| 1b | Electron shell in `desktop/`, Hermes sidecar, desktop CI | IN PROGRESS (see Part 1b state) |
+| 1b | Electron shell in `desktop/`, Hermes sidecar, desktop CI | DONE (tag part-1b-done) |
 | 2 | Auth: single local user, per-install token | TODO |
 | 3 | Bot screens: Chromium per bot, CDP screencast viewer | TODO |
 | 4 | Composio -> local MCP servers, docs/local-tools.md, THIRD_PARTY.md | TODO |
@@ -83,4 +83,10 @@ Split because one part would exceed ~15 files.
 - Draft PR #1 (`local-installer`) is open.
 - Actions: `desktop` workflow is green on `2ff1e41`. `parity` is red on `2ff1e41`: ALL 12 shots differ (light and dark), not only chat-light.
 - Cause: `web/` is byte-identical to `part-0-done`; the only change is the harness in `tests/parity/shoot.mjs` (app logos were loaded from the network; now a fixed stub). That changes pixels in the harness, not in the app. No UI change.
-- Fix: refresh baselines on purpose (`parity` workflow_dispatch `update_baselines=true`), then confirm the next push run compares green, then tag `part-1b-done`.
+- Fix applied: refresh baselines on purpose (`parity` workflow_dispatch `update_baselines=true`), then confirm the next push run compares green, then tag `part-1b-done`.
+
+### Part 1b result
+- Baselines refreshed on purpose via workflow_dispatch `update_baselines=true` (harness change only; `web/` untouched). Also: compare step is skipped in update mode; first screen waits for networkidle + 2 s before its shot.
+- `compare.mjs` now tolerates raster jitter (<= 20 pixels, each channel off by <= 2); the CI compare step does `npm install --no-save pngjs`. Observed: one pixel, off by 1, in chat-dark/light between identical runs.
+- Final run on commit after `8264d5d`: `parity` green (all screenshots match; chat-dark tolerated jitter), `desktop` green. Tagged `part-1b-done`.
+- NEXT: Part 2 (auth: single local user, per-install token, sign-in page skipped; no other UI change). Keep to ONE CI run per part. Not yet verified: Electron on Windows/macOS (builds only at Part 5).
