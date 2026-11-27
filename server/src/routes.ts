@@ -14,6 +14,7 @@ import { computerState, ensureComputer, forgetBotFiles, readyScreen, refreshComp
 import { assignEngine, provisionEngine, removeEngine, syncPersona } from './engine.js';
 import { deleteMemory, listMemories, memoryBot } from './engine-memory.js';
 import { orgo } from './orgo.js';
+import { localConnect, localFields } from './localtools.js';
 import { catalog, connectedToolkits, deleteConnection, disconnect, googleProfile, startConnect, startGoogleLogin, toolkitInfo } from './composio.js';
 import { runRoutine, scheduleRoutine, unscheduleRoutine } from './routines.js';
 import { deleteEventTrigger } from './triggers.js';
@@ -509,6 +510,38 @@ api.post('/apps/:slug/connect', async (c) => {
   if (seq) cb.searchParams.set('seq', String(seq));
   const r = await startConnect(user.id, slug, cb.toString());
   return c.json(r);
+});
+
+// Desktop: the page that asks for an app's token (the cloud version sends the user to the app's own sign-in instead).
+const esc = (s: string) => s.replace(/[&<>"']/g, (ch) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[ch]!));
+api.get('/apps/local-connect', async (c) => {
+  const slug = c.req.query('slug') ?? '';
+  const fields = localFields(slug);
+  const info = fields && (await toolkitInfo(slug));
+  if (!fields || !info) return c.text('Unknown app.', 404);
+  const rest = new URL(c.req.url).searchParams;
+  rest.delete('slug');
+  const cb = new URLSearchParams({ slug, ...Object.fromEntries(rest) }).toString();
+  c.header('Cache-Control', 'no-store');
+  return c.html(`<!doctype html><meta charset="utf-8"><meta name="color-scheme" content="light dark"><title>Connect ${esc(info.name)}</title>
+<body style="font-family:system-ui;max-width:420px;margin:40px auto;padding:0 20px">
+<h2 style="margin:0 0 6px">Connect ${esc(info.name)}</h2>
+<p style="margin:0 0 18px;opacity:.7;font-size:14px">Your own key, kept encrypted on this computer. It is never sent anywhere except to ${esc(info.name)} by the tool that uses it.</p>
+<form id="f">${fields.map((f) => `<label style="display:block;margin:12px 0 4px;font-size:14px">${esc(f.label)}</label><input name="${esc(f.key)}" type="password" autocomplete="off" required style="width:100%;box-sizing:border-box;padding:9px;font:inherit">${f.hint ? `<div style="font-size:12px;opacity:.6;margin-top:3px">${esc(f.hint)}</div>` : ''}`).join('')}
+<button style="margin-top:20px;padding:9px 18px;font:inherit">Connect</button> <span id="e" style="color:#c0392b;font-size:14px"></span></form>
+<script>document.getElementById('f').onsubmit=async function(ev){ev.preventDefault();var b=ev.target.querySelector('button');b.disabled=true;document.getElementById('e').textContent='Checking…';
+var v={};new FormData(ev.target).forEach(function(x,k){v[k]=x});
+try{var r=await fetch('/api/apps/${encodeURIComponent(slug)}/credentials',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(v)});var j=await r.json().catch(function(){return{}});
+if(!r.ok)throw new Error(j.error||('HTTP '+r.status));location.href='/api/apps/callback?'+${jsonForScript(cb)}}catch(e){document.getElementById('e').textContent=e.message;b.disabled=false}}</script>`);
+});
+
+api.post('/apps/:slug/credentials', async (c) => {
+  if (!env.local) return c.json({ error: 'not available' }, 404);
+  const slug = c.req.param('slug');
+  if (!localFields(slug)) return c.json({ error: 'Unknown app' }, 404);
+  const values = await c.req.json<Record<string, string>>().catch(() => ({} as Record<string, string>));
+  try { await localConnect(c.get('user').id, slug, values); } catch (e: any) { return c.json({ error: String(e?.message ?? e).slice(0, 300) }, 400); }
+  return c.json({ ok: true });
 });
 
 api.get('/apps/callback', async (c) => {

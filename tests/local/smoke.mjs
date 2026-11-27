@@ -47,6 +47,7 @@ const step = async (name, fn) => {
 const ok = (cond, msg) => { if (!cond) throw new Error(msg); };
 
 let stderr = '';
+let stdout = '';
 // Only what the desktop shell sets: no cloud keys at all.
 const server = spawn(process.execPath, ['--import', path.join(ROOT, 'tests/no-outbound.mjs'), ENTRY], {
   cwd: TMP,
@@ -58,7 +59,7 @@ const server = spawn(process.execPath, ['--import', path.join(ROOT, 'tests/no-ou
   },
   stdio: ['ignore', 'pipe', 'pipe', 'ipc'],
 });
-server.stdout.on('data', (d) => process.stdout.write(`  [server] ${d}`));
+server.stdout.on('data', (d) => { stdout += d; process.stdout.write(`  [server] ${d}`); });
 server.stderr.on('data', (d) => { stderr += d; process.stdout.write(`  [server!] ${d}`); });
 const exited = new Promise((r) => server.once('exit', (code) => r(code)));
 
@@ -227,6 +228,68 @@ try {
       return p !== first ? p : null;
     }, 20_000);
     ok(second !== first, 'same pid');
+  });
+
+  // ---- apps: local MCP servers instead of Composio. The real GitHub server runs; listing its tools needs no network.
+  const TOKEN = 'ghp_SmokeTestToken0123456789abcdef';
+  const secret = fs.readFileSync(path.join(DATA, 'secret.key'), 'utf8').trim();
+  const mcpAuth = (id) => `Bearer ${crypto.createHmac('sha256', secret).update(`mcp:${id}`).digest('hex')}`;
+  let rpcId = 0;
+  const mcp = async (method, params) => {
+    const r = await fetch(`${BASE}/mcp/${bot.id}`, { method: 'POST', headers: { authorization: mcpAuth(bot.id), 'content-type': 'application/json', accept: 'application/json, text/event-stream' }, body: JSON.stringify({ jsonrpc: '2.0', id: ++rpcId, method, params }) });
+    return r.json();
+  };
+  await step('apps: the catalog is the local servers (MIT/Apache/BSD), none connected yet, no Composio', async () => {
+    const r = (await api('GET', '/api/apps')).json;
+    const slugs = r.apps.map((a) => a.slug).sort();
+    ok(['github', 'gitlab', 'linear', 'notion', 'slack'].every((x) => slugs.includes(x)), `catalog: ${slugs}`);
+    ok(r.connected.length === 0 && r.apps.every((a) => !a.logo), `connected ${r.connected}`);
+    const names = (await mcp('tools/list')).result.tools.map((t) => t.name);
+    ok(!names.some((n) => /^(GITHUB|COMPOSIO)_/.test(n)), `tools before connecting: ${names.filter((n) => /^[A-Z]+_/.test(n))}`);
+  });
+  await step('apps: connect asks for the user\'s token on the app\'s own page; a bad connection is refused', async () => {
+    const start = (await api('POST', '/api/apps/github/connect', { botId: bot.id })).json;
+    ok(start.redirectUrl.startsWith(`${BASE}/api/apps/local-connect?slug=github`) && start.redirectUrl.includes(`bot=${bot.id}`), start.redirectUrl);
+    const page = await fetch(start.redirectUrl, { headers: { cookie } });
+    const html = await page.text();
+    ok(page.status === 200 && html.includes('Personal access token') && html.includes('type="password"'), `form page HTTP ${page.status}`);
+    ok((await fetch(`${BASE}/api/apps/local-connect?slug=github`)).status === 401, 'the form is open without a session');
+    ok((await api('POST', '/api/apps/github/credentials', { token: '' })).status === 400, 'an empty token was accepted');
+    ok((await api('POST', '/api/apps/nope/credentials', { token: 'x' })).status === 404, 'unknown app accepted');
+  });
+  await step('apps: with a token the server starts, shows as connected, and its tools reach the bot', async () => {
+    const r = await api('POST', '/api/apps/github/credentials', { token: TOKEN });
+    ok(r.status === 200, `HTTP ${r.status} ${JSON.stringify(r.json)}`);
+    ok((await api('GET', '/api/apps')).json.connected.includes('github'), 'not connected');
+    const tools = (await mcp('tools/list')).result.tools;
+    const t = tools.find((x) => x.name === 'GITHUB_create_issue');
+    ok(t && t.inputSchema?.properties?.owner && t.description.startsWith('[GitHub]'), `tools: ${tools.map((x) => x.name).filter((n) => n.startsWith('GITHUB')).slice(0, 5)}`);
+  });
+  await step('apps: the token is only in the encrypted file (not in plain files, configs or the log)', async () => {
+    const files = [];
+    const walk = (d) => { for (const f of fs.readdirSync(d, { withFileTypes: true })) { const p = path.join(d, f.name); if (f.isDirectory()) walk(p); else if (fs.statSync(p).size < 5e6) files.push(p); } };
+    walk(DATA);
+    const hit = files.filter((f) => fs.readFileSync(f).includes(TOKEN)).map((f) => path.relative(DATA, f));
+    ok(hit.length === 0, `token found in: ${hit}`);
+    ok(fs.existsSync(path.join(DATA, 'tools.enc')) && (fs.statSync(path.join(DATA, 'tools.enc')).mode & 0o077) === 0, 'tools.enc missing or readable by others');
+    ok(!stdout.includes(TOKEN) && !stderr.includes(TOKEN), 'token in the server output');
+  });
+  await step('apps: an app action waits for the user\'s approval; declining stops it', async () => {
+    const call = mcp('tools/call', { name: 'github_create_issue', arguments: { owner: 'o', repo: 'r', title: 't' } });
+    const card = await until('the approval card', async () => (await api('GET', `/api/bots/${bot.id}/rows`)).json.rows.map((r) => r.body).find((b) => b.card === 'approval' && b.status === 'pending'));
+    ok(card.tool === 'GITHUB_CREATE_ISSUE' && card.toolkit === 'github' && !card.logo, JSON.stringify({ tool: card.tool, toolkit: card.toolkit, logo: card.logo }));
+    ok((await api('POST', `/api/approvals/${card.approvalId}`, { decision: 'deny' })).status === 200, 'approve call failed');
+    const r = await call;
+    ok(/declin/i.test(JSON.stringify(r.result)), `after declining: ${JSON.stringify(r).slice(0, 200)}`);
+  });
+  await step('apps: event routines say plainly that they are not available here', async () => {
+    const r = await mcp('tools/call', { name: 'list_event_triggers', arguments: { toolkit: 'github' } });
+    ok(/not available in the desktop app/.test(JSON.stringify(r.result)), JSON.stringify(r).slice(0, 200));
+  });
+  await step('apps: disconnecting removes the token and the tools', async () => {
+    ok((await api('DELETE', '/api/apps/github')).status === 200, 'delete failed');
+    ok(!(await api('GET', '/api/apps')).json.connected.includes('github'), 'still connected');
+    ok(!(await mcp('tools/list')).result.tools.some((t) => t.name.startsWith('GITHUB_')), 'tools remain');
   });
 
   await step('no connection left this machine', async () => {

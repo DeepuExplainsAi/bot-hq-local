@@ -77,3 +77,7 @@ Steps 1 to 6 as in your brief. Expected touch points: `env.ts`, `paths.ts`, `box
 2. **Windows**: OK to try native Windows Hermes first, with WSL2 not required, and report if it is unreliable?
 3. **Chromium**: OK to use the Chromium bundled in Electron for bot browsers (smaller installer), rather than downloading a separate Chrome?
 4. **xAI**: keep `x_search` and voice with your own `XAI_API_KEY` (optional)?
+
+## Step 4 outcome
+
+Done in Part 4: see `docs/local-tools.md` and `THIRD_PARTY.md`. Gmail, Calendar and Drive ended up "not available locally"; the other proposed servers were replaced by the ones logged in THIRD_PARTY.md (the Slack server is the modelcontextprotocol one, not korotovsky's, which ships a Go binary).

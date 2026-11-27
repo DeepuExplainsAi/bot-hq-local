@@ -130,6 +130,16 @@ async function smoke(url) {
   })()`);
   if (shot.encoding !== 7 || shot.ctl !== 0x90 || shot.jpegStart[0] !== 0xff || shot.width < 400) throw new Error(`bot browser picture: ${JSON.stringify(shot)}`);
   console.log(`BOT BROWSER OK ${shot.width}x${shot.height}, ${shot.jpegLen} bytes of JPEG`);
+  // An app's MCP server runs with the app's own Node (Electron as Node): connect GitHub with a made-up token, look, disconnect.
+  const apps = await win.webContents.executeJavaScript(`(async () => {
+    const post = (u, b) => fetch(u, { method: b ? 'POST' : 'DELETE', headers: { 'content-type': 'application/json' }, body: b && JSON.stringify(b) });
+    const c = await post('/api/apps/github/credentials', { token: 'ghp_smoke_not_a_real_token' });
+    const list = await (await fetch('/api/apps')).json();
+    await post('/api/apps/github');
+    return { status: c.status, body: await c.text(), connected: list.connected };
+  })()`);
+  if (apps.status !== 200 || !apps.connected.includes('github')) throw new Error(`local app server did not start: ${JSON.stringify(apps)}`);
+  console.log('APP SERVER OK');
   if (outside.length) throw new Error(`requests left this machine: ${outside.join(', ')}`);
   console.log(`SMOKE OK ${url}`);
 }
@@ -166,6 +176,17 @@ async function main() {
   trace('server healthy');
   // The page may only talk to its own server: navigation elsewhere opens the browser instead.
   win.webContents.on('will-navigate', (e, to) => { if (!to.startsWith(url) && !to.startsWith('file:')) { e.preventDefault(); if (/^https?:/.test(to)) shell.openExternal(to); } });
+  // The app's own pages (the "connect an app" form) open as a small window that shares the app's sign-in; anything else opens in the browser.
+  win.webContents.setWindowOpenHandler(({ url: u }) => {
+    if (u === 'about:blank' || u.startsWith(`${url}/`)) return { action: 'allow', overrideBrowserWindowOptions: { width: 520, height: 680, autoHideMenuBar: true } };
+    if (/^https?:/.test(u)) shell.openExternal(u);
+    return { action: 'deny' };
+  });
+  // Those windows may not open further windows or leave the app.
+  win.webContents.on('did-create-window', (child) => {
+    child.webContents.setWindowOpenHandler(({ url }) => { if (/^https?:/.test(url)) shell.openExternal(url); return { action: 'deny' }; });
+    child.webContents.on('will-navigate', (e, to) => { if (!to.startsWith(`${url}/`) && to !== 'about:blank') { e.preventDefault(); if (/^https?:/.test(to)) shell.openExternal(to); } });
+  });
   if (SMOKE) return smoke(url);
   await win.loadURL(await signInUrl(dirs().data, url)); // single local user: no sign-in page
 }

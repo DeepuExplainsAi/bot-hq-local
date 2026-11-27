@@ -3,6 +3,7 @@ import { OpenAIResponsesProvider } from '@composio/openai';
 import { db } from './db.js';
 import { env } from './env.js';
 import type { Toolkit } from './types.js';
+import { localCatalog, localConnected, localDisconnect, localExecute, localTools } from './localtools.js';
 
 // Desktop mode never calls Composio (step 4 removes it): the placeholder key only lets the SDK object exist, and the
 // SDK's own usage analytics and npm version check, which would be outbound calls, are off.
@@ -25,6 +26,7 @@ type CatalogItem = Omit<Toolkit, 'connected'>;
 let catalogCache: { at: number; items: CatalogItem[] } | null = null;
 
 export async function catalog(): Promise<CatalogItem[]> {
+  if (env.local) return localCatalog();
   if (catalogCache && Date.now() - catalogCache.at < 3600_000) return catalogCache.items;
   const items: CatalogItem[] = [];
   let cursor: string | undefined;
@@ -55,6 +57,7 @@ export async function toolkitInfo(slug: string): Promise<CatalogItem | undefined
 // ---------- per-user connections ----------
 
 export async function connectedToolkits(userId: string): Promise<Set<string>> {
+  if (env.local) return localConnected(userId);
   const r = await composio.connectedAccounts.list({ userIds: [userId], statuses: ['ACTIVE'] } as any);
   const items: any[] = (r as any).items ?? [];
   return new Set(items.map((i) => i.toolkit?.slug ?? i.toolkitSlug).filter(Boolean));
@@ -66,6 +69,7 @@ export async function connectionsDetail(userId: string) {
 }
 
 export async function disconnect(userId: string, toolkit: string) {
+  if (env.local) return localDisconnect(userId, toolkit);
   for (const c of await connectionsDetail(userId)) {
     if (c.toolkit === toolkit) await composio.connectedAccounts.delete(c.id);
   }
@@ -94,6 +98,12 @@ export async function sessionFor(userId: string): Promise<any> {
 
 /** Start a connect flow; returns the hosted Connect Link URL. */
 export async function startConnect(userId: string, toolkit: string, callbackUrl: string): Promise<{ redirectUrl: string; connectedAccountId?: string }> {
+  // Desktop: the app's own page asks for the token (routes.ts), then lands on the same callback.
+  if (env.local) {
+    const url = new URL(`${env.serverUrl}/api/apps/local-connect`);
+    url.search = new URL(callbackUrl).search; // slug, bot, seq
+    return { redirectUrl: url.toString() };
+  }
   const session = await sessionFor(userId);
   const req = await session.authorize(toolkit, { callbackUrl });
   return { redirectUrl: req.redirectUrl, connectedAccountId: req.id };
@@ -101,6 +111,7 @@ export async function startConnect(userId: string, toolkit: string, callbackUrl:
 
 /** OpenAI-Responses-format function tools for this user's Composio session (meta tools). */
 export async function composioTools(userId: string): Promise<any[]> {
+  if (env.local) return localTools(userId);
   try {
     const session = await sessionFor(userId);
     const tools = await session.tools();
@@ -112,6 +123,7 @@ export async function composioTools(userId: string): Promise<any[]> {
 }
 
 export async function executeComposio(userId: string, name: string, args: Record<string, unknown>) {
+  if (env.local) return localExecute(userId, name, args);
   const session = await sessionFor(userId);
   const r = await session.execute(name, args);
   return r as { data?: unknown; error?: unknown; resultType?: string; logId?: string };

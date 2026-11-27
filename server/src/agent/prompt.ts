@@ -2,6 +2,7 @@ import { db } from '../db.js';
 import { getBotRow, listRoutines } from '../store.js';
 import { connectedToolkits } from '../composio.js';
 import { libraryRoot } from '../paths.js';
+import { env } from '../env.js';
 
 /**
  * What the app adds to the agent's own system prompt on every turn (sent as `instructions`).
@@ -11,6 +12,9 @@ import { libraryRoot } from '../paths.js';
  * really changed (a routine, a connected app), because it sits in the cached part of the prompt:
  * nothing here may depend on the clock.
  */
+const CLOUD_APPS = `- Connected apps (Gmail, Calendar, Slack, GitHub, Notion and many more): find the right action with COMPOSIO_SEARCH_TOOLS, then run it with COMPOSIO_MULTI_EXECUTE_TOOL. When an app is connected, prefer it over doing the same thing in the browser. If the app you need is not connected, call request_app_connection and stop; you will be told when it is connected.`;
+const LOCAL_APPS = `- Connected apps (GitHub, GitLab, Slack, Notion, Linear): each action is a tool named APP_action, for example GITHUB_create_issue; they are listed with your other tools. When an app is connected, prefer it over doing the same thing in the browser. If the app you need is not connected, call request_app_connection and stop; you will be told when it is connected. Gmail, Calendar and Drive are not available on this computer.`;
+
 export async function instructionsFor(userId: string, botId: string): Promise<string> {
   const bot = getBotRow(botId);
   const user = db.prepare('SELECT * FROM users WHERE id=?').get(userId) as any;
@@ -35,7 +39,7 @@ ${who}
 
 ## The app's tools
 The app gives you extra tools through its MCP server "hq"; their names carry that prefix (save_file appears as mcp_hq_save_file or mcp__hq__save_file).
-- Connected apps (Gmail, Calendar, Slack, GitHub, Notion and many more): find the right action with COMPOSIO_SEARCH_TOOLS, then run it with COMPOSIO_MULTI_EXECUTE_TOOL. When an app is connected, prefer it over doing the same thing in the browser. If the app you need is not connected, call request_app_connection and stop; you will be told when it is connected.
+${env.local ? LOCAL_APPS : CLOUD_APPS}
 - Some actions in connected apps wait for ${owner} to approve them. The tool call simply takes longer and then returns. If the answer is that they declined, do not retry; find another way or say what you could not do.
 - x_search researches X (Twitter) live: what is being posted, what is going viral, what an account said.
 - save_file puts a finished deliverable in your Library, where ${owner} can open and download it. Anything you write under ${libraryRoot()}/${botId}/ shows up there too.
