@@ -37,7 +37,7 @@ The earlier billing block ("recent account payments have failed") only affected 
 | 3b | Home (new-tab) page port, reset screen, deterministic viewer frame in the mock + refreshed baselines | DONE (tag part-3-done) |
 | 4 | Composio -> local MCP servers, docs/local-tools.md, THIRD_PARTY.md | DONE (tag part-4-done) |
 | 5 | electron-builder + Actions matrix (win/mac/linux), installed-app smoke | DONE (tag part-5-done) |
-| 6 | Verification report | IN PROGRESS |
+| 6 | Verification report (`docs/VERIFICATION.md`) | DONE (tag part-6-done) |
 
 ## Part 0 details
 Files: `tests/parity/mock-api.mjs` (fixed-data API, `/__signed-out`, WS upgrades destroyed), `tests/parity/shoot.mjs` (Playwright 1440x900,
@@ -138,3 +138,11 @@ The earlier handoff said TODO because the previous AI ran out of credit before w
 - Installers are unsigned (macOS Gatekeeper / Windows SmartScreen warn on first start). macOS build is Apple silicon only.
 - Not yet run by me: the installers themselves on a real laptop. CI starts the unpacked app, not the .exe/.dmg/.deb installer UI.
 - NEXT: Part 6 (verification report). Items still missing a test: chat turn through the gateway, routine creation + scheduler run, restart keeps data, gitleaks re-scan.
+
+
+## Part 6 state (verification) - DONE
+- Added `tests/local/verify.mjs` (7 steps: fresh start, create bot, chat, viewer picture, routine created by the bot and run by the scheduler, restart keeps data + scheduler resumes, no outbound), a `/v1/responses` SSE answer and an `hq` MCP call in `tests/local/fake-hermes.mjs`, and in `parity.yml` the verify step and a gitleaks history scan (needs `fetch-depth: 0`).
+- First CI run on `5be4c8d` was green: parity 46002262087 (security 51/51, smoke 28/28, verify 7/7, gitleaks "no leaks found" on 54 commits, screenshots match), desktop 46002262143, installers 46002262031 (Windows, macOS, Linux). Nothing was run in the sandbox this time.
+- The previous AI's last open item (reviewing routines / owner-auth / routine creation) is covered by security.mjs (owner key, sign-in links, routine create/delete rules: all PASS) and verify step 5.
+- Report with the honest "not verified" list: `docs/VERIFICATION.md`. Audit updated (c) item 9.
+- ALL PARTS DONE. NEXT (user): try the installer from the installers run artifacts on a real laptop; the unproven item is real Hermes on native Windows. Open PR #1 stays draft.

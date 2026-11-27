@@ -66,6 +66,7 @@ Anything with no acceptable local server is listed as "not available locally" at
 6. **Hosted sandbox tools** (`COMPOSIO_REMOTE_WORKBENCH`/`REMOTE_BASH_TOOL`) are removed. Hermes' own local terminal tool covers the use, but it runs on the user's real machine, not in a sandbox.
 7. **Windows**: Hermes supports native Windows, but the app's Python and shell helpers (`hqlib.py`, `bash -c` in `box.ts`, `/proc` scanning) are Linux-only. The Linux desktop parts are dropped (item 1), and `box.bash` has to use `cmd`/PowerShell or be bypassed there. It is the riskiest platform; macOS and Linux are lower risk.
 8. **Signed installers**: unsigned builds show SmartScreen / Gatekeeper warnings (accepted).
+9. **Added at Part 6** (see `docs/VERIFICATION.md`): the bot browser's own window is never shown (viewer only); no clipboard sync and no Ctrl/Cmd editing shortcuts in control mode; the new-tab page lists only a Browser tile; one Electron process per bot browser; app logos are letter tiles; after an in-app logout only a restart signs in again; macOS installer is Apple silicon only.
 
 ## Proposed plan and size
 
