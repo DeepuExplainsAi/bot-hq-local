@@ -13,7 +13,10 @@ if (process.env.BOTHQ_BROWSER_HOST === '1') { require('./botbrowser.cjs'); retur
 
 const SMOKE = process.argv.includes('--smoke');
 const trace = (m) => { if (SMOKE) console.log(`[smoke] ${m}`); };
-const ROOT = process.env.BOTHQ_ROOT || path.resolve(__dirname, '..'); // the folder holding server/ and web/
+// The folder holding server/ and web/: next to the app in a repository checkout, inside the package when installed.
+const ROOT = process.env.BOTHQ_ROOT || (app.isPackaged ? path.join(process.resourcesPath, 'bothq') : path.resolve(__dirname, '..'));
+// An AppImage cannot carry the setuid helper Chromium's sandbox needs (the .deb can).
+if (process.platform === 'linux' && process.env.APPIMAGE && !process.argv.includes('--no-sandbox')) { process.argv.push('--no-sandbox'); app.commandLine.appendSwitch('no-sandbox'); }
 const PREFERRED_PORT = 8787;
 
 app.setName('Bot HQ');
