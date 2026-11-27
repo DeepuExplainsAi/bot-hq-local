@@ -157,3 +157,24 @@ Do not touch main. Open one draft pull request from `local-installer` so I
 can see all commits.
 FIRST ACTION: save this entire prompt, unchanged, as docs/MASTER_PROMPT.md
 and commit it. HANDOFF.md must point to it.
+
+## Part C: compute rule (added later, overrides anything above)
+
+Do NOT approve the machine resize and do not use any paid upgrade.
+Keep the sandbox only for editing code, git and reading logs.
+Run everything heavy in GitHub Actions: Playwright baseline screenshots,
+typecheck, build, tests, Electron builds, Hermes install test.
+
+Part 0 now:
+- Add a workflow with workflow_dispatch + push to `local-installer`:
+  start tests/parity/mock-api.mjs and the app, take baseline screenshots
+  with Playwright, upload them as an artifact AND commit them to
+  docs/parity/ (only when run with an input `update_baselines=true`).
+- Cache npm and Playwright browsers. Use concurrency with
+  cancel-in-progress. Run daily checks on ubuntu only. Run windows/macos
+  builds only at the final installer part, to save free minutes.
+- Do ONE CI run per part (batch your changes), not one per commit.
+- If a CI run fails, read it with `gh run view --log-failed`, fix, retry.
+  After two real attempts mark the part BLOCKED in docs/HANDOFF.md.
+- Add this rule to docs/HANDOFF.md and docs/MASTER_PROMPT.md, then
+  continue Part 0 and the remaining parts automatically.

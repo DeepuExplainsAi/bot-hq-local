@@ -1,0 +1,55 @@
+name: parity
+on:
+  push:
+    branches: [local-installer]
+  workflow_dispatch:
+    inputs:
+      update_baselines:
+        description: Commit the new screenshots to docs/parity/
+        type: boolean
+        default: false
+concurrency:
+  group: parity-${{ github.ref }}
+  cancel-in-progress: true
+permissions:
+  contents: write
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 22, cache: npm }
+      - run: npm ci
+      - run: npm run typecheck
+      - run: npm run build
+      - name: Playwright browsers cache
+        id: pw
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/ms-playwright
+          key: pw-${{ runner.os }}-${{ hashFiles('package-lock.json') }}
+      - run: npx playwright install --with-deps chromium
+        if: steps.pw.outputs.cache-hit != 'true'
+      - run: npx playwright install-deps chromium
+        if: steps.pw.outputs.cache-hit == 'true'
+      - name: Start mock API and web app
+        run: |
+          node tests/parity/mock-api.mjs &
+          BOTHQ_API=http://127.0.0.1:8799 npm run dev -w web > vite.log 2>&1 &
+          npx --yes wait-on http://localhost:5173 http://127.0.0.1:8799/api/health --timeout 60000
+      - name: Screenshots
+        run: node tests/parity/shoot.mjs docs/parity-new
+      - name: Compare with baselines
+        run: node tests/parity/compare.mjs docs/parity docs/parity-new
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with: { name: parity-screenshots, path: docs/parity-new }
+      - name: Commit baselines
+        if: ${{ github.event_name == 'workflow_dispatch' && inputs.update_baselines }}
+        run: |
+          rm -rf docs/parity && mv docs/parity-new docs/parity
+          git config user.name "github-actions"; git config user.email "actions@users.noreply.github.com"
+          git add docs/parity
+          git diff --cached --quiet || { git commit -m "parity: update baseline screenshots"; git push; }
