@@ -32,7 +32,7 @@ The earlier billing block ("recent account payments have failed") only affected 
 | 0 | PARITY.md, mock API, screenshot workflow, baselines | DONE (tag part-0-done) |
 | 1a | Server desktop mode (`BOTHQ_LOCAL=1`) | DONE (tag part-1a-done) |
 | 1b | Electron shell in `desktop/`, Hermes sidecar, desktop CI | DONE (tag part-1b-done) |
-| 2 | Auth: single local user, per-install token | TODO |
+| 2 | Auth: single local user, per-install token | IN PROGRESS (pushed, waiting for CI) |
 | 3 | Bot screens: Chromium per bot, CDP screencast viewer | TODO |
 | 4 | Composio -> local MCP servers, docs/local-tools.md, THIRD_PARTY.md | TODO |
 | 5 | electron-builder + Actions matrix (win/mac/linux) | TODO |
@@ -90,3 +90,9 @@ Split because one part would exceed ~15 files.
 - `compare.mjs` now tolerates raster jitter (<= 20 pixels, each channel off by <= 2); the CI compare step does `npm install --no-save pngjs`. Observed: one pixel, off by 1, in chat-dark/light between identical runs.
 - Final run on commit after `8264d5d`: `parity` green (all screenshots match; chat-dark tolerated jitter), `desktop` green. Tagged `part-1b-done`.
 - NEXT: Part 2 (auth: single local user, per-install token, sign-in page skipped; no other UI change). Keep to ONE CI run per part. Not yet verified: Electron on Windows/macOS (builds only at Part 5).
+
+## Part 2 (auth) state
+- Design (no server change, no new route): `desktop/localauth.cjs` derives the owner key from the per-install `<data>/secret.key` (HMAC 'owner-login', as `isOwnerKey` expects), calls `POST /api/auth/owner {link:true}` (loopback only, no forwarding headers), and the shell loads the one-time link. It sets the session cookie for the fixed local user `me@localhost` and redirects to `/`; the sign-in page is never shown. Sign-in page file, Google routes and `ALLOWED_EMAILS` stay untouched (unused locally).
+- Tests: `tests/local/smoke.mjs` now signs in this way (API 401 without a session, link works once then 410, wrong key and forwarded request refused 403). Electron smoke (`desktop/main.cjs --smoke`) fails unless `/api/auth/me` shows `me@localhost`.
+- Not run in the sandbox (Compute Rule): result comes from the CI run on the commit that follows this note.
+- Known: if the user logs out in the app, the sign-in page shows and the only way back is restarting the app (it signs in again on every launch).
