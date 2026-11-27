@@ -47,6 +47,7 @@ jobs:
         timeout-minutes: 5
         run: node tests/parity/shoot.mjs docs/parity-new
       - name: Compare with baselines
+        if: ${{ !(github.event_name == 'workflow_dispatch' && inputs.update_baselines) }}
         run: node tests/parity/compare.mjs docs/parity docs/parity-new
       - name: Server log
         if: always()
