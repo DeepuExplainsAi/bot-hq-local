@@ -8,6 +8,7 @@ const path = require('node:path');
 const { ensureHermes } = require('./hermes.cjs');
 
 const SMOKE = process.argv.includes('--smoke');
+const trace = (m) => { if (SMOKE) console.log(`[smoke] ${m}`); };
 const ROOT = process.env.BOTHQ_ROOT || path.resolve(__dirname, '..'); // the folder holding server/ and web/
 const PREFERRED_PORT = 8787;
 
@@ -112,6 +113,14 @@ async function smoke(url) {
 
 async function main() {
   const { hermes } = dirs();
+  if (SMOKE) {
+    // A hung start must fail the CI step with the server's own log, not run until the job times out.
+    setTimeout(() => {
+      console.error('SMOKE TIMEOUT. server.log:\n' + (fs.existsSync(path.join(dirs().logs, 'server.log')) ? fs.readFileSync(path.join(dirs().logs, 'server.log'), 'utf8') : '(none)'));
+      app.exit(1);
+    }, 90_000).unref();
+  }
+  trace('main');
   win = new BrowserWindow({ width: 1440, height: 900, minWidth: 900, minHeight: 600, title: 'Bot HQ', show: !SMOKE, backgroundColor: '#f5f5f5' });
   win.removeMenu?.();
   win.webContents.setWindowOpenHandler(({ url }) => { if (/^https?:/.test(url)) shell.openExternal(url); return { action: 'deny' }; });
@@ -129,7 +138,9 @@ async function main() {
   }
   const port = await pickPort();
   const url = startServer(port, hermesBin);
+  trace(`server started on ${url}`);
   await waitForHealth(url);
+  trace('server healthy');
   // The page may only talk to its own server: navigation elsewhere opens the browser instead.
   win.webContents.on('will-navigate', (e, to) => { if (!to.startsWith(url) && !to.startsWith('file:')) { e.preventDefault(); if (/^https?:/.test(to)) shell.openExternal(to); } });
   if (SMOKE) return smoke(url);

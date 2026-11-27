@@ -33,7 +33,7 @@ jobs:
       - name: Rebuild better-sqlite3 for Electron
         run: npx --yes @electron/rebuild@4.2.1 -v 45.5.0 -w better-sqlite3 -f
       - name: Launch the app under a virtual display
-        run: xvfb-run -a npx electron . --no-sandbox --smoke
+        run: timeout 150 xvfb-run -a npx electron . --no-sandbox --smoke
         working-directory: desktop
 
   hermes:

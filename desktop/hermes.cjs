@@ -90,11 +90,23 @@ async function ensureHermes(root, say = () => {}) {
     UV_NO_CONFIG: '1',
     HERMES_HOME: path.join(root, 'install-home'), // anything Hermes writes while installing stays here
   };
-  say(`Setting up Python ${PYTHON}`);
-  await run(uv, ['venv', '--python', PYTHON, '--managed-python', '--clear', venv], { env });
-  say(`Installing Hermes Agent ${HERMES_VERSION} (a few minutes, once)`);
-  const source = `hermes-agent[all] @ https://github.com/NousResearch/hermes-agent/archive/refs/tags/${HERMES_VERSION}.tar.gz`;
-  await run(uv, ['pip', 'install', '--python', venv, source], { env, timeout: 30 * 60_000 });
+  // Hermes pins its dependencies in its own uv.lock (and overrides in [tool.uv]); `uv pip install <url>` would ignore those and
+  // fail to resolve, so the release is unpacked and installed from its lock file with `uv sync --frozen`.
+  say(`Downloading Hermes Agent ${HERMES_VERSION}`);
+  const src = path.join(root, 'src');
+  fs.rmSync(src, { recursive: true, force: true });
+  fs.mkdirSync(src, { recursive: true });
+  const archive = path.join(root, 'hermes-src.tar.gz');
+  fs.writeFileSync(archive, await download(`https://github.com/NousResearch/hermes-agent/archive/refs/tags/${HERMES_VERSION}.tar.gz`));
+  await run('tar', ['-xzf', archive, '-C', src, '--strip-components=1']);
+  fs.rmSync(archive, { force: true });
+  say(`Installing Python ${PYTHON} and Hermes (a few minutes, once)`);
+  await run(uv, ['sync', '--frozen', '--no-dev', '--extra', 'all', '--no-editable', '--python', PYTHON, '--managed-python'], {
+    cwd: src,
+    env: { ...env, UV_PROJECT_ENVIRONMENT: venv },
+    timeout: 30 * 60_000,
+  });
+  fs.rmSync(src, { recursive: true, force: true });
   if (!fs.existsSync(bin)) throw new Error(`Hermes installed but ${bin} is missing.`);
   say('Checking Hermes');
   await run(bin, ['--version'], { env, timeout: 120_000 });
