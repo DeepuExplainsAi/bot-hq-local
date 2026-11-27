@@ -1,0 +1,15 @@
+{
+  "name": "bot-hq-desktop",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Bot HQ as a desktop app: the server, the agents and the window all run on this computer.",
+  "license": "MIT",
+  "main": "main.cjs",
+  "scripts": {
+    "start": "electron .",
+    "smoke": "electron . --smoke"
+  },
+  "devDependencies": {
+    "electron": "45.5.0"
+  }
+}
