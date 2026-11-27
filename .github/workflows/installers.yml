@@ -43,10 +43,13 @@ jobs:
       - name: The installed app starts, serves the UI and talks to nothing outside this machine
         shell: bash
         run: |
+          # Pipe through tee so a windowed program is waited for; judge by what it printed, not by its exit code.
           case "$RUNNER_OS" in
-            Linux) timeout 180 xvfb-run -a "${{ matrix.unpacked }}" --no-sandbox --smoke ;;
-            *) "${{ matrix.unpacked }}" --smoke ;;
+            Linux) timeout 180 xvfb-run -a "${{ matrix.unpacked }}" --no-sandbox --smoke 2>&1 | tee smoke.log ;;
+            *) "${{ matrix.unpacked }}" --smoke 2>&1 | tee smoke.log ;;
           esac
+          grep -q "^SMOKE OK" smoke.log
+          grep -E "BOT BROWSER OK|APP SERVER OK" smoke.log
       - name: Licenses are inside the package
         shell: bash
         run: |

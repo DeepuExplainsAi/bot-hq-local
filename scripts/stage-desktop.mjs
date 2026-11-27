@@ -16,6 +16,7 @@ copy('server/dist', 'server/dist');
 copy('server/box', 'server/box');
 copy('server/package.json', 'server/package.json');
 copy('web/dist', 'web/dist');
+copy('tests/local/rfb-client.cjs', 'tests/local/rfb-client.cjs'); // the app's --smoke check reads the bot screen with it
 
 // The server's own dependencies only (no dev tools, no web build tools), exactly the versions in the lock file.
 const server = JSON.parse(fs.readFileSync(path.join(ROOT, 'server/package.json'), 'utf8'));
