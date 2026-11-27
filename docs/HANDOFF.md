@@ -35,7 +35,7 @@ The earlier billing block ("recent account payments have failed") only affected 
 | 2 | Auth: single local user, per-install token | DONE (tag part-2-done) |
 | 3a | Bot browser per bot (Electron Chromium process), RFB-over-CDP viewer, Hermes `cdp_url`, preview screenshot | DONE (tag part-3a-done) |
 | 3b | Home (new-tab) page port, reset screen, deterministic viewer frame in the mock + refreshed baselines | DONE (tag part-3-done) |
-| 4 | Composio -> local MCP servers, docs/local-tools.md, THIRD_PARTY.md | IN PROGRESS (pushed, waiting for CI) |
+| 4 | Composio -> local MCP servers, docs/local-tools.md, THIRD_PARTY.md | DONE (tag part-4-done) |
 | 5 | electron-builder + Actions matrix (win/mac/linux) | TODO |
 | 6 | Verification report | TODO |
 
@@ -126,3 +126,5 @@ Split of part 3 (>15 files): 3a = the plumbing below; 3b = look of the bot brows
 - Docs: `THIRD_PARTY.md` (licenses, 280-package tree checked by `scripts/licenses.mjs`), `docs/local-tools.md`.
 - Not available locally (said in the docs): Gmail, Calendar, Drive, event routines, Composio's sandbox, the rest of Composio's catalog; app logos (letter tiles). GitHub and Slack servers are archived/deprecated upstream (MIT, still work); revisit if a maintained MIT server appears.
 - Sandbox: `tsc` clean, `node tests/local/smoke.mjs` 28/28 (7 new steps: catalog, form page, token check, token only in encrypted file, approval card on an action and decline, event routines message, disconnect). Electron smoke gained `APP SERVER OK`.
+- CI (runs 45998562733 desktop, 45998562677 parity, both green): security 51/51, smoke 28/28, Electron `APP SERVER OK` + `BOT BROWSER OK` + `SMOKE OK`, screenshots match.
+- NEXT: Part 5 (electron-builder installers: Windows .exe, macOS .dmg, Linux .AppImage/.deb; electron-rebuild for better-sqlite3; the app's server dependencies and the tool servers must be inside the package).
