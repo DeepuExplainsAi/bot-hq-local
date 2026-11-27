@@ -178,3 +178,9 @@ Part 0 now:
   After two real attempts mark the part BLOCKED in docs/HANDOFF.md.
 - Add this rule to docs/HANDOFF.md and docs/MASTER_PROMPT.md, then
   continue Part 0 and the remaining parts automatically.
+
+## Part D: public repo decision
+
+Option 1 chosen: the repo is made public so GitHub-hosted Actions runners are free. Before that the ENTIRE git history
+(21 commits) was scanned with gitleaks 8.30.1 plus a regex sweep: no secrets (only the `change-me` placeholder in `.env.example`).
+Never commit secrets from now on (keys, tokens, .env, private keys, real databases). Scan again with gitleaks before the final installer part.

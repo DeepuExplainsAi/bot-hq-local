@@ -22,6 +22,10 @@ Everything heavy runs in GitHub Actions: Playwright, typecheck, build, tests, El
 - Workflow `parity` (push to local-installer, workflow_dispatch input `update_baselines`) uses npm and Playwright caches and cancel-in-progress.
 - Do not run npm builds, Chromium or vite in the sandbox.
 
+## Public repo (decision)
+Repo is PUBLIC (free Actions). Full history scanned with gitleaks 8.30.1 + regex sweep before publishing: clean. NEVER commit secrets; re-scan before Part 5.
+The earlier billing block ("recent account payments have failed") only affected the private repo.
+
 ## Part status
 | Part | What | Status |
 |---|---|---|
