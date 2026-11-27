@@ -45,6 +45,8 @@ for (const scheme of ['light', 'dark']) {
   console.log('goto', scheme);
   await p.goto(`${base}/?fixtures=idle`, { waitUntil: 'domcontentloaded' });
   await p.getByLabel('Search').first().waitFor({ timeout: 20000 });
+  await p.waitForLoadState('networkidle').catch(() => {});
+  await p.waitForTimeout(2000); // first paint is still settling for a moment; later shots were already stable
   await shot(p, `chat-${scheme}`);
   await step('search', async () => { await p.getByLabel('Search').first().click(); await shot(p, `search-${scheme}`); await p.keyboard.press('Escape'); });
   await step('new-bot', async () => { await p.getByLabel('New Bot').first().click(); await shot(p, `new-bot-${scheme}`); await p.keyboard.press('Escape'); });
