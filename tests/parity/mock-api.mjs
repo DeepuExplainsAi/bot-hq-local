@@ -36,6 +36,7 @@ const routes = [
   ['GET', /^\/api\/policies$/, () => ({ policies: [] })],
   ['GET', /^\/api\/apps$/, () => ({ apps, connected: ['github'], categories: ['Communication', 'Developer'], total: 2, connectedApps: apps.filter((a) => a.connected) })],
   ['GET', /^\/api\/bots\/[^/]+\/screenshot$/, () => null],
+  ['GET', /^\/api\/voice\/options$/, () => ({ voices: [{ id: 'eve', name: 'Eve' }, { id: 'ara', name: 'Ara' }], languages: [{ code: 'auto', name: 'Auto' }, { code: 'en', name: 'English' }], speeds: [0.7, 1, 1.5] })],
   ['GET', /^\/api\/health$/, () => ({ ok: true })],
 ];
 const state = { signedIn: true };
