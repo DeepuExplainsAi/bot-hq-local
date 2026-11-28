@@ -78,6 +78,8 @@ jobs:
           done
           test -n "$APP" || { echo "installer did not produce Bot HQ.exe"; cat install.out; ls "$(cygpath -u "$LOCALAPPDATA")/Programs" 2>&1; exit 1; }
           echo "installed at: $APP"
+          for i in $(seq 1 90); do tasklist | grep -qi "Bot-HQ-.*-win-x64.exe" || break; sleep 3; done   # the .exe appears early: wait until the installer has finished copying
+          echo "installer finished; files in resources/bothq: $(ls "$(dirname "$APP")/resources/bothq" | tr '\n' ' ')"
           sleep 15
           taskkill //F //IM "Bot HQ.exe" //T >/dev/null 2>&1   # an app the installer started itself: start over from a clean first run
           sleep 3
