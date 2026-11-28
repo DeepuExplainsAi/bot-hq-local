@@ -1,6 +1,6 @@
 {
   "name": "bot-hq-desktop",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "private": true,
   "description": "Bot HQ as a desktop app: the server, the agents and the window all run on this computer.",
   "license": "MIT",

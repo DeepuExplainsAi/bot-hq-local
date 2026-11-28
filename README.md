@@ -49,7 +49,7 @@ This branch (`local-installer`) turns Bot HQ into a desktop app that runs entire
 - Apps (GitHub, GitLab, Slack, Notion, Linear) run as local MCP servers with your own tokens. Not available locally: Gmail, Calendar, Drive, event triggers.
 - Voice and `x_search` work only if you add your own `XAI_API_KEY`.
 
-**Download:** [v0.1.0 pre-release](https://github.com/DeepuExplainsAi/bot-hq-local/releases/tag/v0.1.0) (Windows .exe, macOS .dmg Apple silicon, Linux .AppImage/.deb). Builds are unsigned. See the release notes for install steps, and `docs/VERIFICATION.md` for what was and was not tested.
+**Download:** [v0.1.1 pre-release](https://github.com/DeepuExplainsAi/bot-hq-local/releases/tag/v0.1.1) (Windows .exe, macOS .dmg Apple silicon, Linux .AppImage/.deb). Builds are unsigned. See the release notes for install steps, and `docs/VERIFICATION.md` for what was and was not tested.
 
 Original project and MIT license: by [Nick Vasilescu](https://github.com/nickvasilescu/bot-hq). This fork keeps the LICENSE and notices.
 
