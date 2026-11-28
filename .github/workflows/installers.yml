@@ -65,6 +65,34 @@ jobs:
         run: |
           BOTHQ_SMOKE_HERMES=1 "${{ matrix.unpacked }}" --smoke 2>&1 | tee smoke-hermes.log
           grep -q "^SMOKE OK" smoke-hermes.log
+      - name: Windows only - run the real .exe installer silently, then start the INSTALLED app normally (not --smoke) like a user
+        if: runner.os == 'Windows'
+        shell: bash
+        run: |
+          set +e
+          INSTALLER="$(ls release/*.exe | head -1)"
+          "$INSTALLER" /S
+          APP="$(cygpath -u "$LOCALAPPDATA")/Programs/Bot HQ/Bot HQ.exe"
+          for i in $(seq 1 30); do [ -f "$APP" ] && break; sleep 2; done
+          test -f "$APP" || { echo "installer did not produce $APP"; ls -R "$(cygpath -u "$LOCALAPPDATA")/Programs" | head -30; exit 1; }
+          echo "installed at: $APP"
+          LOG="$(cygpath -u "$APPDATA")/Bot HQ/logs/server.log"
+          "$APP" > app.out 2>&1 &
+          APPPID=$!
+          ok=0
+          for i in $(seq 1 120); do   # up to 10 min: first run installs Hermes (about 2 min)
+            sleep 5
+            if curl -sf http://127.0.0.1:8787/api/health >/dev/null; then ok=1; break; fi
+            if ! tasklist | grep -qi "Bot HQ.exe"; then echo "the app process is gone"; break; fi
+          done
+          if [ $ok = 1 ]; then
+            sleep 20
+            curl -sf http://127.0.0.1:8787/api/health >/dev/null && tasklist | grep -qi "Bot HQ.exe" && echo "INSTALLED APP STAYS UP" || ok=0
+          fi
+          echo "--- app.out"; cat app.out
+          echo "--- server.log (tail)"; tail -40 "$LOG" 2>&1
+          taskkill //F //IM "Bot HQ.exe" //T >/dev/null 2>&1
+          test $ok = 1
       - name: Licenses are inside the package
         shell: bash
         run: |
