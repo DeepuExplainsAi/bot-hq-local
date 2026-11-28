@@ -1,6 +1,6 @@
 # Part 8: bug and error check (by reading code + CI; no features, no UI change)
 
-Only existing checks were run, in CI (nothing heavy in the sandbox): typecheck, build, security 51, smoke, verify, Electron smoke, installers (see HANDOFF.md for run ids). I did not test offline / disk-full / interrupted installs by actually causing them; those rows are from reading the code.
+Only existing checks were run, in CI (nothing heavy in the sandbox): typecheck, build, security 51, smoke, verify, Electron smoke, installers on commit `4dad60e`: parity 46112015969 (typecheck, build, security, smoke, verify, screenshots), desktop 46112015959, installers 46112016048, hermes-real 46112015977 (Windows and macOS), all green. I did not test offline / disk-full / interrupted installs by actually causing them; those rows are from reading the code.
 
 | # | Area | Finding | Status |
 |---|---|---|---|
