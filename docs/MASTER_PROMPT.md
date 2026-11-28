@@ -184,3 +184,12 @@ Part 0 now:
 Option 1 chosen: the repo is made public so GitHub-hosted Actions runners are free. Before that the ENTIRE git history
 (21 commits) was scanned with gitleaks 8.30.1 plus a regex sweep: no secrets (only the `change-me` placeholder in `.env.example`).
 Never commit secrets from now on (keys, tokens, .env, private keys, real databases). Scan again with gitleaks before the final installer part.
+
+## Part E: Working principles (added later; applies to every part from now on)
+
+Adapted in my own words from the Karpathy-style coding guidelines (multica-ai/andrej-karpathy-skills). One deliberate difference from that source: it says to stop and ask when something is unclear; here the user wants no stopping, so the rule below replaces it.
+
+1. **Think first.** Before coding, state the assumptions and the tradeoffs. If something is ambiguous, do not stop and ask: choose the safest, smallest option and record the choice in `docs/HANDOFF.md`. Stop only for the stop-rules already in this file (license not MIT/Apache/BSD, a part blocked after two real attempts, a choice that would change the UI or features).
+2. **Simplicity.** Write the minimum code that solves the problem. No extra features, no single-use abstractions, no options nobody asked for.
+3. **Surgical changes.** Touch only what the task needs. No refactors or reformatting of nearby code. Mention unrelated problems instead of fixing them. Remove only what your own change made unused. The app's look and features stay exactly the same.
+4. **Goal-driven.** Before each part, write its success check (tests, CI green, parity screenshots). Loop until it passes. Report only what was actually run.

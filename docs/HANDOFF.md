@@ -166,3 +166,9 @@ The earlier handoff said TODO because the previous AI ran out of credit before w
 - Two small fixes: Retry/Quit dialog when the Hermes first-run setup fails (`desktop/main.cjs`); `uv` copied via `uv.part` + rename (`desktop/hermes.cjs`). Findings table in `docs/BUGCHECK.md`.
 - Not fixed: processes survive a hard kill of the app (needs a watchdog); non-ASCII Windows usernames and real offline/disk-full not tested; Windows has no 0600 file mode.
 - Release v0.1.0 does NOT contain these two fixes (built before). A later release would.
+
+
+## Working principles (added after part 8)
+- `docs/MASTER_PROMPT.md` Part E holds the rules (think first, simplicity, surgical changes, goal-driven); root `CLAUDE.md` only points to it.
+- Decision: the source guidelines say "ask when unclear"; the user's instruction overrides that (pick the safest smallest option, record it here, stop only on the existing stop-rules).
+- Pending task from the user's last message: none open. The bug check (part 8) is done and tagged; nothing else was left pending.
