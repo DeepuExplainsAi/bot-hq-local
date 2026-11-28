@@ -73,7 +73,7 @@ jobs:
           INSTALLER="$(ls release/*.exe | head -1)"
           MSYS_NO_PATHCONV=1 "$INSTALLER" /S > install.out 2>&1 &   # not waited for: the installer may start the app itself and not return
           for i in $(seq 1 90); do   # up to 3 min
-            APP="$(find "$(cygpath -u "$LOCALAPPDATA")" "/c/Program Files" -maxdepth 4 -name "Bot HQ.exe" -not -path "*win-unpacked*" 2>/dev/null | head -1)"
+            APP="$(find "$(cygpath -u "$LOCALAPPDATA")/Programs" "/c/Program Files" -maxdepth 3 -name "Bot HQ.exe" 2>/dev/null | head -1)"
             [ -n "$APP" ] && break; sleep 2
           done
           test -n "$APP" || { echo "installer did not produce Bot HQ.exe"; cat install.out; ls "$(cygpath -u "$LOCALAPPDATA")/Programs" 2>&1; exit 1; }
