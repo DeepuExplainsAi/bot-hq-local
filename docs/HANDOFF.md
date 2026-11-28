@@ -180,3 +180,13 @@ The earlier handoff said TODO because the previous AI ran out of credit before w
 - Version bumped to 0.1.1 in `desktop/package.json` so file names match; README release link updated.
 - CI on `784ef13`: installers 46113248356 green, desktop 46113248360 green, parity 46113248355 FAILED once (verify steps 3, 5, 6: the fake gateway for the bot exited 1 while starting, a second start of the same gateway; looks like a start race under CI load) and passed on re-run of the failed job. Not investigated further: possible real race in `engine.ts` startGateway when a health check times out (adopt-vs-spawn). If it recurs, look there first.
 - Release v0.1.1 (pre-release) made from installers run 46113248356; assets: Windows .exe, macOS arm64 .dmg, Linux .AppImage + .deb. Nothing merged into main.
+
+## Part 10 (installed Windows app: server exit code 1, release v0.1.2) - DONE
+- **Root cause:** electron-builder's `extraResources` never copies a `node_modules` folder. The NSIS-installed app had `resources/bothq/{server,web,tests}` but no `node_modules`, so the server died with `ERR_MODULE_NOT_FOUND: @hono/node-server` (exit 1). The earlier `win-unpacked` smoke passed only because that build was not the installed layout. Found by installing the real `.exe` in CI.
+- **Fix:** `desktop/after-pack.cjs` (electron-builder `afterPack`) copies `build/stage/node_modules` into `resources/bothq/node_modules` for every OS and fails the build if `@hono/node-server` is missing.
+- **Error dialog:** shows the last 20 lines of `server.log` (`desktop/main.cjs`).
+- **CI (installers.yml, Windows):** runs the real NSIS `.exe` with `/S`, waits for it to finish, deletes app-data, starts the INSTALLED app normally (not `--smoke`), waits up to 10 min for `/api/health` on 8787 (first run installs Hermes), requires it to stay up 20 s. Also: unpacked-app smoke with the real Hermes setup (`BOTHQ_SMOKE_HERMES=1`).
+- **Also fixed:** Hermes `tar` on Windows is `System32\tar.exe` (Git's GNU tar reads `C:\x` as host `C`). Smoke fails fast with `HERMES SETUP FAILED`.
+- **CI:** installers 46122415137, parity and desktop green on `e0ef58d`. The installed-app step printed `INSTALLED APP STAYS UP`.
+- **Version:** 0.1.2. README links to v0.1.2.
+- **Open:** the intermittent `verify` start race (see Part 9); leftover processes after a hard kill; Windows file modes. Not confirmed on the user's laptop: only on the GitHub runner.
