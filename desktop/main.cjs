@@ -164,12 +164,17 @@ async function main() {
   let hermesBin = null;
   if (!SMOKE) {
     showStatus('Starting…');
-    try {
-      hermesBin = await ensureHermes(hermes, showStatus);
-    } catch (e) {
-      // No silent fallback to WSL2 or Docker: say what failed and stop.
-      showStatus(`Hermes could not be set up.\n\n${e.message}`, true);
-      return;
+    for (;;) {
+      try {
+        hermesBin = await ensureHermes(hermes, showStatus);
+        break;
+      } catch (e) {
+        // No silent fallback to WSL2 or Docker: say what failed, then retry or quit.
+        showStatus(`Hermes could not be set up.\n\n${e.message}`, true);
+        const { response } = await dialog.showMessageBox(win, { type: 'error', message: 'Hermes could not be set up.', detail: `${e.message}\n\nCheck the internet connection and free disk space, then retry. Nothing half-installed is kept.`, buttons: ['Retry', 'Quit'], defaultId: 0, cancelId: 1 });
+        if (response !== 0) { app.quit(); return; }
+        showStatus('Starting…');
+      }
     }
   }
   const port = await pickPort();

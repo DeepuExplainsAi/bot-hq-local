@@ -39,6 +39,7 @@ The earlier billing block ("recent account payments have failed") only affected 
 | 5 | electron-builder + Actions matrix (win/mac/linux), installed-app smoke | DONE (tag part-5-done) |
 | 6 | Verification report (`docs/VERIFICATION.md`) | DONE (tag part-6-done) |
 | 7 | Real Hermes install + gateway health on Windows and macOS | DONE (tag part-7-done) |
+| 8 | Bug and error check (`docs/BUGCHECK.md`) | DONE (tag part-8-done) |
 
 ## Part 0 details
 Files: `tests/parity/mock-api.mjs` (fixed-data API, `/__signed-out`, WS upgrades destroyed), `tests/parity/shoot.mjs` (Playwright 1440x900,
@@ -159,3 +160,9 @@ The earlier handoff said TODO because the previous AI ran out of credit before w
 ## Release v0.1.0 (pre-release)
 - Created from installers run 46021312052 (commit 93a1826, green). Assets: Windows .exe, macOS arm64 .dmg, Linux .AppImage + .deb. Notes list install steps, unsigned, Apple silicon only. README describes the local app and links the release. Nothing merged into main. PR #1 stays draft.
 - Tag `v0.1.0` points at the release commit on `local-installer`.
+
+
+## Part 8 (bug check) - DONE
+- Two small fixes: Retry/Quit dialog when the Hermes first-run setup fails (`desktop/main.cjs`); `uv` copied via `uv.part` + rename (`desktop/hermes.cjs`). Findings table in `docs/BUGCHECK.md`.
+- Not fixed: processes survive a hard kill of the app (needs a watchdog); non-ASCII Windows usernames and real offline/disk-full not tested; Windows has no 0600 file mode.
+- Release v0.1.0 does NOT contain these two fixes (built before). A later release would.

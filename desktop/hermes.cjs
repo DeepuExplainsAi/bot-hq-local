@@ -59,8 +59,10 @@ async function ensureUv(root, say) {
     const found = findFile(tmp, path.basename(uv));
     if (!found) throw new Error('uv was not in its archive.');
     fs.mkdirSync(path.dirname(uv), { recursive: true });
-    fs.copyFileSync(found, uv);
-    fs.chmodSync(uv, 0o755);
+    // Copy under another name, then rename: an interrupted copy must not leave a broken uv that later runs trust.
+    fs.copyFileSync(found, `${uv}.part`);
+    fs.chmodSync(`${uv}.part`, 0o755);
+    fs.renameSync(`${uv}.part`, uv);
   } finally {
     fs.rmSync(tmp, { recursive: true, force: true });
   }
