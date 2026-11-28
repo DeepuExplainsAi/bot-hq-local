@@ -154,3 +154,8 @@ The earlier handoff said TODO because the previous AI ran out of credit before w
 - One CI run (46021312124): Windows PASS (install 87 s, health at 101 s), macOS PASS (23 s / 31 s). Native Windows Hermes works, so no fallback is needed (and none was added). Details in `docs/VERIFICATION.md`.
 - Still unproven: real model turns, the hq MCP link and the bot browser (cdp_url) under real Hermes on Windows/macOS; installer UIs; signing.
 - NEXT (user): install an artifact from the installers run on a laptop and chat with a real key.
+
+
+## Release v0.1.0 (pre-release)
+- Created from installers run 46021312052 (commit 93a1826, green). Assets: Windows .exe, macOS arm64 .dmg, Linux .AppImage + .deb. Notes list install steps, unsigned, Apple silicon only. README describes the local app and links the release. Nothing merged into main. PR #1 stays draft.
+- Tag `v0.1.0` points at the release commit on `local-installer`.
