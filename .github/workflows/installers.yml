@@ -59,6 +59,12 @@ jobs:
           BOTHQ_SMOKE_DIR="$D" "${{ matrix.unpacked }}" --smoke 2>&1 | tee smoke-unicode.log
           grep -q "^SMOKE OK" smoke-unicode.log
           grep -E "BOT BROWSER OK|APP SERVER OK" smoke-unicode.log
+      - name: Windows only - clean first run of the installed app WITH the real Hermes setup, server must stay up
+        if: runner.os == 'Windows'
+        shell: bash
+        run: |
+          BOTHQ_SMOKE_HERMES=1 "${{ matrix.unpacked }}" --smoke 2>&1 | tee smoke-hermes.log
+          grep -q "^SMOKE OK" smoke-hermes.log
       - name: Licenses are inside the package
         shell: bash
         run: |

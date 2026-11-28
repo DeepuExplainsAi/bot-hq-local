@@ -77,8 +77,10 @@ function startServer(port, hermesBin) {
   server.once('exit', (code) => {
     server = null;
     if (quitting) return;
-    const message = `The Bot HQ server exited (code ${code}). See ${path.join(logs, 'server.log')}.`;
-    if (SMOKE) console.error(`${message}\n${fs.readFileSync(path.join(logs, 'server.log'), 'utf8')}`);
+    let tail = '';
+    try { tail = fs.readFileSync(path.join(logs, 'server.log'), 'utf8').trimEnd().split('\n').slice(-20).join('\n'); } catch { /* no log */ }
+    const message = `The Bot HQ server exited (code ${code}). Full log: ${path.join(logs, 'server.log')}\n\nLast lines:\n${tail || '(empty)'}`;
+    if (SMOKE) console.error(message);
     else dialog.showErrorBox('Bot HQ stopped', message); // a modal box would hang a CI run
     app.exit(1);
   });
@@ -154,7 +156,7 @@ async function main() {
     setTimeout(() => {
       console.error('SMOKE TIMEOUT. server.log:\n' + (fs.existsSync(path.join(dirs().logs, 'server.log')) ? fs.readFileSync(path.join(dirs().logs, 'server.log'), 'utf8') : '(none)'));
       app.exit(1);
-    }, 90_000).unref();
+    }, process.env.BOTHQ_SMOKE_HERMES === "1" ? 900_000 : 90_000).unref();
   }
   trace('main');
   win = new BrowserWindow({ width: 1440, height: 900, minWidth: 900, minHeight: 600, title: 'Bot HQ', show: !SMOKE, backgroundColor: '#f5f5f5' });
@@ -162,7 +164,8 @@ async function main() {
   win.webContents.setWindowOpenHandler(({ url }) => { if (/^https?:/.test(url)) shell.openExternal(url); return { action: 'deny' }; });
 
   let hermesBin = null;
-  if (!SMOKE) {
+  // BOTHQ_SMOKE_HERMES=1 (CI): a smoke run that also does the real first-run Hermes setup, like a clean install.
+  if (!SMOKE || process.env.BOTHQ_SMOKE_HERMES === '1') {
     showStatus('Starting…');
     for (;;) {
       try {
