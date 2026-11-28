@@ -105,7 +105,7 @@ jobs:
         shell: bash
         run: |
           for f in LICENSE THIRD_PARTY.md THIRD_PARTY_NOTICES.md; do
-            p="$(find release -path '*resources*' -name "$f" -o -path '*Resources*' -name "$f" | head -1)"
+            p="$(find release \( -path '*resources*' -o -path '*Resources*' \) -name "$f" -print -quit)"
             test -s "$p" && echo "ok $p" || { echo "MISSING $f"; exit 1; }
           done
       - uses: actions/upload-artifact@v4
