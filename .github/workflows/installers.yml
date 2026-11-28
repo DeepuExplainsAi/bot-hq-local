@@ -50,6 +50,15 @@ jobs:
           esac
           grep -q "^SMOKE OK" smoke.log
           grep -E "BOT BROWSER OK|APP SERVER OK" smoke.log
+      - name: Windows only - the installed app with spaces and non-ASCII letters in its app-data path
+        if: runner.os == 'Windows'
+        shell: bash
+        run: |
+          D="$(node -e "const p=require('path').join(require('os').tmpdir(),'D\u012bp\u016b Gupta');require('fs').mkdirSync(p,{recursive:true});console.log(p)")"
+          echo "app-data parent: $D"
+          BOTHQ_SMOKE_DIR="$D" "${{ matrix.unpacked }}" --smoke 2>&1 | tee smoke-unicode.log
+          grep -q "^SMOKE OK" smoke-unicode.log
+          grep -E "BOT BROWSER OK|APP SERVER OK" smoke-unicode.log
       - name: Licenses are inside the package
         shell: bash
         run: |

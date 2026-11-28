@@ -21,7 +21,7 @@ const PREFERRED_PORT = 8787;
 
 app.setName('Bot HQ');
 // CI smoke runs never touch a real profile.
-if (SMOKE) app.setPath('userData', fs.mkdtempSync(path.join(require('node:os').tmpdir(), 'bothq-smoke-')));
+if (SMOKE) app.setPath('userData', fs.mkdtempSync(path.join(process.env.BOTHQ_SMOKE_DIR || require('node:os').tmpdir(), 'bothq-smoke-')));
 let win = null;
 let server = null;
 let quitting = false;
