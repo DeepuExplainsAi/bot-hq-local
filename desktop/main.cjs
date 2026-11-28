@@ -169,11 +169,12 @@ async function main() {
     showStatus('Starting…');
     for (;;) {
       try {
-        hermesBin = await ensureHermes(hermes, showStatus);
+        hermesBin = await ensureHermes(hermes, (t) => { trace(t); showStatus(t); });
         break;
       } catch (e) {
         // No silent fallback to WSL2 or Docker: say what failed, then retry or quit.
         showStatus(`Hermes could not be set up.\n\n${e.message}`, true);
+        if (SMOKE) { console.error(`HERMES SETUP FAILED: ${e.message}`); app.exit(1); return; } // a modal dialog would hang CI
         const { response } = await dialog.showMessageBox(win, { type: 'error', message: 'Hermes could not be set up.', detail: `${e.message}\n\nCheck the internet connection and free disk space, then retry. Nothing half-installed is kept.`, buttons: ['Retry', 'Quit'], defaultId: 0, cancelId: 1 });
         if (response !== 0) { app.quit(); return; }
         showStatus('Starting…');

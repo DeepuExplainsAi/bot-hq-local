@@ -16,6 +16,8 @@ const TRIPLES = {
   'win32-x64': 'x86_64-pc-windows-msvc', 'win32-arm64': 'aarch64-pc-windows-msvc',
 };
 
+// Windows' own tar (bsdtar). A GNU tar earlier on PATH (Git for Windows) reads `C:\\x` as host `C`.
+const TAR = win ? path.join(process.env.SystemRoot || 'C:\\Windows', 'System32', 'tar.exe') : 'tar';
 const run = (cmd, args, opts = {}) => new Promise((resolve, reject) => {
   execFile(cmd, args, { maxBuffer: 64 * 1024 * 1024, windowsHide: true, ...opts }, (err, stdout, stderr) => {
     if (err) reject(new Error(`${path.basename(cmd)} ${args[0] ?? ''} failed: ${String(stderr || stdout || err.message).trim().split('\n').slice(-12).join('\n')}`));
@@ -55,7 +57,7 @@ async function ensureUv(root, say) {
   try {
     const file = path.join(tmp, asset);
     fs.writeFileSync(file, archive);
-    await run('tar', ['-xf', file, '-C', tmp]); // Windows 10+ ships a tar that reads zip files too
+    await run(TAR, ['-xf', file, '-C', tmp]); // Windows 10+ ships a tar that reads zip files too
     const found = findFile(tmp, path.basename(uv));
     if (!found) throw new Error('uv was not in its archive.');
     fs.mkdirSync(path.dirname(uv), { recursive: true });
@@ -100,7 +102,7 @@ async function ensureHermes(root, say = () => {}) {
   fs.mkdirSync(src, { recursive: true });
   const archive = path.join(root, 'hermes-src.tar.gz');
   fs.writeFileSync(archive, await download(`https://github.com/NousResearch/hermes-agent/archive/refs/tags/${HERMES_VERSION}.tar.gz`));
-  await run('tar', ['-xzf', archive, '-C', src, '--strip-components=1']);
+  await run(TAR, ['-xzf', archive, '-C', src, '--strip-components=1']);
   fs.rmSync(archive, { force: true });
   say(`Installing Python ${PYTHON} and Hermes (a few minutes, once)`);
   await run(uv, ['sync', '--frozen', '--no-dev', '--extra', 'all', '--python', PYTHON, '--managed-python'], {
