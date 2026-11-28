@@ -1,0 +1,25 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>Bot HQ</title>
+<style>
+  html, body { height: 100%; margin: 0; }
+  body { display: flex; align-items: center; justify-content: center; background: #f5f5f5; color: #1f1f1f; font: 15px system-ui, sans-serif; }
+  main { width: 380px; text-align: center; }
+  h1 { font-size: 22px; margin: 18px 0 6px; }
+  p { margin: 6px 0; color: #666; min-height: 1.4em; }
+  .bar { height: 4px; border-radius: 2px; background: #ddd; overflow: hidden; margin-top: 22px; }
+  .bar i { display: block; height: 100%; width: 35%; background: #1f1f1f; animation: slide 1.2s ease-in-out infinite; }
+  @keyframes slide { 0% { margin-left: -35%; } 100% { margin-left: 100%; } }
+  .error p { color: #b3261e; white-space: pre-wrap; text-align: left; }
+</style>
+<main id="m">
+  <svg width="80" height="80" viewBox="0 0 80 80"><circle cx="40" cy="40" r="40"/><g fill="#fff"><ellipse cx="29" cy="39" rx="5" ry="7"/><ellipse cx="51" cy="39" rx="5" ry="7"/></g></svg>
+  <h1>Bot HQ</h1>
+  <p id="t">Starting…</p>
+  <div class="bar" id="b"><i></i></div>
+</main>
+<script>
+  const q = new URLSearchParams(location.search);
+  document.getElementById('t').textContent = q.get('text') || 'Starting…';
+  if (q.get('error')) { document.getElementById('m').className = 'error'; document.getElementById('b').remove(); }
+</script>

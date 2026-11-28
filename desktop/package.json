@@ -1,0 +1,92 @@
+{
+  "name": "bot-hq-desktop",
+  "version": "0.1.1",
+  "private": true,
+  "description": "Bot HQ as a desktop app: the server, the agents and the window all run on this computer.",
+  "license": "MIT",
+  "main": "main.cjs",
+  "scripts": {
+    "start": "electron .",
+    "smoke": "electron . --smoke",
+    "stage": "node ../scripts/stage-desktop.mjs",
+    "dist": "electron-builder"
+  },
+  "devDependencies": {
+    "electron": "45.5.0",
+    "electron-builder": "26.8.1"
+  },
+  "author": "Bot HQ contributors <noreply@users.noreply.github.com>",
+  "homepage": "https://github.com/DeepuExplainsAi/bot-hq-local",
+  "build": {
+    "appId": "ai.bothq.desktop",
+    "productName": "Bot HQ",
+    "artifactName": "Bot-HQ-${version}-${os}-${arch}.${ext}",
+    "directories": {
+      "output": "../release"
+    },
+    "asar": false,
+    "npmRebuild": false,
+    "files": [
+      "main.cjs",
+      "hermes.cjs",
+      "botbrowser.cjs",
+      "localauth.cjs",
+      "setup.html",
+      "package.json"
+    ],
+    "extraResources": [
+      {
+        "from": "../build/stage",
+        "to": "bothq"
+      },
+      {
+        "from": "../LICENSE",
+        "to": "LICENSE"
+      },
+      {
+        "from": "../THIRD_PARTY.md",
+        "to": "THIRD_PARTY.md"
+      },
+      {
+        "from": "../THIRD_PARTY_NOTICES.md",
+        "to": "THIRD_PARTY_NOTICES.md"
+      }
+    ],
+    "win": {
+      "target": [
+        {
+          "target": "nsis",
+          "arch": [
+            "x64"
+          ]
+        }
+      ]
+    },
+    "nsis": {
+      "oneClick": false,
+      "perMachine": false,
+      "allowToChangeInstallationDirectory": true
+    },
+    "mac": {
+      "target": [
+        {
+          "target": "dmg",
+          "arch": [
+            "arm64"
+          ]
+        }
+      ],
+      "identity": null,
+      "category": "public.app-category.productivity"
+    },
+    "linux": {
+      "target": [
+        "AppImage",
+        "deb"
+      ],
+      "category": "Utility",
+      "executableName": "bot-hq",
+      "maintainer": "Bot HQ contributors <noreply@users.noreply.github.com>"
+    }
+  }
+}

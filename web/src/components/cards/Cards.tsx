@@ -37,7 +37,7 @@ export function ApprovalCard({ body }: { body: Card<'approval'> }) {
   return (
     <div className={`card approval-card${pending ? '' : ' is-resolved'}`}>
       <div className="card__head">
-        <ToolkitLogo name={name} logo={body.toolkit ? `https://logos.composio.dev/api/${body.toolkit.toLowerCase()}` : undefined} size={44} />
+        <ToolkitLogo name={name} logo={body.logo} size={44} />
         <div className="card__titles">
           <div className="card__title">{body.title}</div>
           <div className="card__sub">{name}</div>

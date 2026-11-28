@@ -11,7 +11,8 @@ const CURRENT = '/root/bothq';
 const LEGACY = '/root/grokbot';
 const pick = (hasCurrent: boolean, hasLegacy: boolean) => (!hasCurrent && hasLegacy ? LEGACY : CURRENT);
 
-let boxData = env.localBox ? pick(fs.existsSync(CURRENT), fs.existsSync(LEGACY)) : CURRENT;
+// Desktop mode keeps everything in the app-data folder.
+let boxData = env.local ? env.dataDir : env.localBox ? pick(fs.existsSync(CURRENT), fs.existsSync(LEGACY)) : CURRENT;
 
 export const libraryRoot = () => `${boxData}/files`;
 export const profilesRoot = () => `${boxData}/profiles`;

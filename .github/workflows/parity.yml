@@ -1,0 +1,73 @@
+name: parity
+on:
+  push:
+    branches: [local-installer]
+  workflow_dispatch:
+    inputs:
+      update_baselines:
+        description: Commit the new screenshots to docs/parity/
+        type: boolean
+        default: false
+concurrency:
+  group: parity-${{ github.ref }}
+  cancel-in-progress: true
+permissions:
+  contents: write
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+        with: { fetch-depth: 0 }
+      - uses: actions/setup-node@v4
+        with: { node-version: 22, cache: npm }
+      - run: npm ci
+      - run: npm run typecheck
+      - run: npm run build
+      - name: Existing security tests
+        run: node tests/security.mjs
+      - name: Desktop-mode smoke test
+        run: node tests/local/smoke.mjs
+      - name: Verification (fresh start, bot, chat, screen, routines, restart keeps data, no outbound)
+        run: node tests/local/verify.mjs
+      - name: Secret scan of the whole history (gitleaks)
+        run: |
+          curl -sSL https://github.com/gitleaks/gitleaks/releases/download/v8.30.1/gitleaks_8.30.1_linux_x64.tar.gz | tar xz gitleaks
+          ./gitleaks detect --no-banner --redact --log-opts="--all"
+      - name: Playwright browsers cache
+        id: pw
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/ms-playwright
+          key: pw-${{ runner.os }}-${{ hashFiles('package-lock.json') }}
+      - run: npx playwright install --with-deps chromium
+        if: steps.pw.outputs.cache-hit != 'true'
+      - run: npx playwright install-deps chromium
+        if: steps.pw.outputs.cache-hit == 'true'
+      - name: Start mock API and web app
+        run: |
+          node tests/parity/mock-api.mjs &
+          BOTHQ_API=http://127.0.0.1:8799 npm run dev -w web > vite.log 2>&1 &
+          npx --yes wait-on http://localhost:5173 http://127.0.0.1:8799/api/health --timeout 60000
+      - name: Screenshots
+        timeout-minutes: 5
+        run: node tests/parity/shoot.mjs docs/parity-new
+      - name: Compare with baselines
+        if: ${{ !(github.event_name == 'workflow_dispatch' && inputs.update_baselines) }}
+        run: |
+          npm install --no-save --no-package-lock pngjs
+          node tests/parity/compare.mjs docs/parity docs/parity-new
+      - name: Server log
+        if: always()
+        run: tail -30 vite.log || true
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with: { name: parity-screenshots, path: docs/parity-new }
+      - name: Commit baselines
+        if: ${{ github.event_name == 'workflow_dispatch' && inputs.update_baselines }}
+        run: |
+          rm -rf docs/parity && mv docs/parity-new docs/parity
+          git config user.name "github-actions"; git config user.email "actions@users.noreply.github.com"
+          git add docs/parity
+          git diff --cached --quiet || { git commit -m "parity: update baseline screenshots"; git push; }

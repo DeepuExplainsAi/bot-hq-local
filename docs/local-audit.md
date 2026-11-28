@@ -66,6 +66,7 @@ Anything with no acceptable local server is listed as "not available locally" at
 6. **Hosted sandbox tools** (`COMPOSIO_REMOTE_WORKBENCH`/`REMOTE_BASH_TOOL`) are removed. Hermes' own local terminal tool covers the use, but it runs on the user's real machine, not in a sandbox.
 7. **Windows**: Hermes supports native Windows, but the app's Python and shell helpers (`hqlib.py`, `bash -c` in `box.ts`, `/proc` scanning) are Linux-only. The Linux desktop parts are dropped (item 1), and `box.bash` has to use `cmd`/PowerShell or be bypassed there. It is the riskiest platform; macOS and Linux are lower risk.
 8. **Signed installers**: unsigned builds show SmartScreen / Gatekeeper warnings (accepted).
+9. **Added at Part 6** (see `docs/VERIFICATION.md`): the bot browser's own window is never shown (viewer only); no clipboard sync and no Ctrl/Cmd editing shortcuts in control mode; the new-tab page lists only a Browser tile; one Electron process per bot browser; app logos are letter tiles; after an in-app logout only a restart signs in again; macOS installer is Apple silicon only.
 
 ## Proposed plan and size
 
@@ -77,3 +78,7 @@ Steps 1 to 6 as in your brief. Expected touch points: `env.ts`, `paths.ts`, `box
 2. **Windows**: OK to try native Windows Hermes first, with WSL2 not required, and report if it is unreliable?
 3. **Chromium**: OK to use the Chromium bundled in Electron for bot browsers (smaller installer), rather than downloading a separate Chrome?
 4. **xAI**: keep `x_search` and voice with your own `XAI_API_KEY` (optional)?
+
+## Step 4 outcome
+
+Done in Part 4: see `docs/local-tools.md` and `THIRD_PARTY.md`. Gmail, Calendar and Drive ended up "not available locally"; the other proposed servers were replaced by the ones logged in THIRD_PARTY.md (the Slack server is the modelcontextprotocol one, not korotovsky's, which ships a Go binary).

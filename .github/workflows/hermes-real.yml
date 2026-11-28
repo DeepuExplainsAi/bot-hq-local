@@ -1,0 +1,27 @@
+name: hermes-real
+# Real Hermes (no model, no key) on Windows and macOS: first-run install from desktop/hermes.cjs, then a gateway's /health.
+# Ubuntu is covered by the `hermes` job in desktop.yml. Runs on demand and on pushes that touch Hermes setup.
+on:
+  workflow_dispatch:
+  push:
+    branches: [local-installer]
+    paths: ['desktop/hermes.cjs', 'tests/local/hermes-real.mjs', '.github/workflows/hermes-real.yml']
+concurrency:
+  group: hermes-real-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  real:
+    name: ${{ matrix.name }}
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 45
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { name: Windows (native, no WSL/Docker), os: windows-latest }
+          - { name: macOS (Apple silicon), os: macos-latest }
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 22 }
+      - run: node tests/local/hermes-real.mjs

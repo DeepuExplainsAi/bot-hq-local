@@ -5,6 +5,8 @@ import { newId } from './lib/ids.js';
 import { hub } from './lib/hub.js';
 import { requireUser, type AuthVars } from './lib/auth.js';
 import fs from 'node:fs';
+import fsp from 'node:fs/promises';
+import path from 'node:path';
 import { Readable } from 'node:stream';
 import { env } from './env.js';
 import { libraryRoot } from './paths.js';
@@ -13,6 +15,7 @@ import { computerState, readyScreen, resetBotScreen } from './computer.js';
 import { box } from './box.js';
 import { orgo } from './orgo.js';
 import { openTerminal } from './desk.js';
+import { openLocalTerminal } from './local-terminal.js';
 import { engineHome, engineInfo, engineKind, forgetEngineOptions, restartEngine, stopOwnScreen } from './engine.js';
 import { listMemories } from './engine-memory.js';
 import { idleConfig, viewerCount } from './idle.js';
@@ -150,12 +153,14 @@ configApi.post('/bots/:id/engine/login', async (c) => {
   if (!box.local) return c.json({ error: 'Sign-in opens a terminal on the computer. It works once the app runs on that computer.' }, 409);
   const { provider } = await c.req.json<{ provider?: string }>().catch(() => ({} as { provider?: string }));
   if (provider !== undefined && !/^[a-z0-9][a-z0-9._-]{0,40}$/.test(provider)) return c.json({ error: 'bad provider' }, 400);
-  const hermes = `HERMES_HOME=${box.quote(home)} ${box.quote(env.hermesBin)}`;
+  const win = process.platform === 'win32';
+  const hermes = win ? `set "HERMES_HOME=${home}" && "${env.hermesBin}"` : `HERMES_HOME=${box.quote(home)} ${box.quote(env.hermesBin)}`;
   // Claude subscriptions sign in with OAuth; without the flag Hermes asks for an API key.
   const cmd = !provider ? `${hermes} model` : `${hermes} auth add ${provider}${provider === 'anthropic' ? ' --type oauth' : ''}`;
   try {
-    const s = await readyScreen(user.id, b.id);
-    await openTerminal(s.screenId, cmd, provider ? `Sign in: ${provider}` : 'Choose a model');
+    const title = provider ? `Sign in: ${provider}` : 'Choose a model';
+    if (env.local) await openLocalTerminal(cmd, title);
+    else await openTerminal((await readyScreen(user.id, b.id)).screenId, cmd, title);
     forgetEngineOptions(b.id);
     return c.json({ ok: true });
   } catch (e: any) {
@@ -222,6 +227,17 @@ export function parseLs(out: string): LibraryFile[] {
   return files.sort((a, b) => Number(b.isDir) - Number(a.isDir) || b.modifiedAt - a.modifiedAt);
 }
 
+/** The same listing as `ls -la` gives on the computer, read with Node so it works on every OS. */
+async function listDir(root: string, dir: string): Promise<LibraryFile[]> {
+  await fsp.mkdir(root, { recursive: true });
+  const entries = await fsp.readdir(dir, { withFileTypes: true });
+  const files = await Promise.all(entries.map(async (e): Promise<LibraryFile> => {
+    const st = await fsp.stat(path.join(dir, e.name)).catch(() => null); // follows links, like the file view does
+    return { name: e.name, size: st?.size ?? 0, modifiedAt: Math.floor((st?.mtimeMs ?? 0) / 1000) * 1000, isDir: st?.isDirectory() ?? e.isDirectory() };
+  }));
+  return files.sort((a, b) => Number(b.isDir) - Number(a.isDir) || b.modifiedAt - a.modifiedAt);
+}
+
 configApi.get('/bots/:id/files', async (c) => {
   const user = c.get('user');
   const b = ownBot(user.id, c.req.param('id'));
@@ -231,6 +247,7 @@ configApi.get('/bots/:id/files', async (c) => {
   try {
     if (!box.local && computerState(user.id).status !== 'running') return c.json({ status: 'asleep', path: rel, files: [] });
     const dir = `${libraryRoot()}/${b.id}${rel ? `/${rel}` : ''}`;
+    if (env.local) return c.json({ status: 'ok', path: rel, files: await listDir(`${libraryRoot()}/${b.id}`, dir) });
     const r = await box.bash(`mkdir -p ${shq(`${libraryRoot()}/${b.id}`)} && ls -la --time-style=+%s ${shq(dir)} 2>&1`, 30);
     if (r.exit_code !== 0) return c.json({ status: 'error', path: rel, files: [], error: (r.output ?? '').slice(0, 300) });
     return c.json({ status: 'ok', path: rel, files: parseLs(r.output ?? '') });
@@ -269,7 +286,7 @@ configApi.get('/bots/:id/files/raw', (c) => {
   try {
     // Follow links before checking, so a link inside the library cannot point outside it.
     file = fs.realpathSync(`${root}/${rel}`);
-    if (!file.startsWith(fs.realpathSync(root) + '/') || !fs.statSync(file).isFile()) throw new Error('outside');
+    if (!file.startsWith(fs.realpathSync(root) + path.sep) || !fs.statSync(file).isFile()) throw new Error('outside');
   } catch {
     return c.json({ error: 'not found' }, 404);
   }

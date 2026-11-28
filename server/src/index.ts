@@ -19,7 +19,10 @@ import { desSelfTest } from './lib/des.js';
 import { configApi } from './routes-config.js';
 import { startIdleWatcher } from './idle.js';
 import { mcpApi } from './mcp.js';
-import { initEngines } from './engine.js';
+import { initEngines, stopAllGateways } from './engine.js';
+import { stopLocalTools } from './localtools.js';
+import { homeApi } from './home.js';
+import { stopAllBrowsers } from './botbrowser.js';
 import { sameOriginWrites } from './lib/auth.js';
 import { resolveBoxData } from './paths.js';
 
@@ -46,19 +49,27 @@ app.use('/api/*', sameOriginWrites);
 app.get('/api/health', (c) => c.json({ ok: true, engine: 'hermes' }));
 // The app's tools for the agent engines (MCP).
 app.route('/mcp', mcpApi);
+if (env.local) app.route('/bot-home', homeApi);
 app.route('/api/checkins', checkinsApi);
 app.route('/api/rooms', roomsApi);
 app.route('/api', api);
 app.route('/api', configApi);
 
 // Serve the built web app in production.
-const webDist = path.resolve(new URL('.', import.meta.url).pathname, '../../web/dist');
+const webDist = env.webDist;
 if (fs.existsSync(webDist)) {
   app.use('/*', serveStatic({ root: path.relative(process.cwd(), webDist) }));
   app.get('*', (c) => c.html(fs.readFileSync(path.join(webDist, 'index.html'), 'utf8')));
 }
 
-const server = serve({ fetch: app.fetch, port: env.port, hostname: env.host }, (info) => console.log(`[bothq] server on http://localhost:${info.port} (listening on ${env.host ?? 'every interface'})`));
+const server = serve({ fetch: app.fetch, port: env.port, hostname: env.host }, (info) => console.log(`[bothq] server on http://localhost:${info.port} (listening on ${env.host ?? 'every interface'})`))
+// The desktop shell asks the server to stop; the agents it started go down with it.
+if (env.local) {
+  const quit = () => void Promise.all([stopAllGateways(), stopAllBrowsers(), stopLocalTools()]).finally(() => process.exit(0));
+  process.on('SIGTERM', quit);
+  process.on('SIGINT', quit);
+  process.on('message', (m) => { if (m === 'quit') quit(); });
+};
 attachVncRelay(server as unknown as Server);
 // BOTHQ_NO_SCHEDULER=1 for extra dev/test servers sharing a database copy, so routines and triggers don't fire twice.
 if (compatEnv('NO_SCHEDULER') !== '1') {

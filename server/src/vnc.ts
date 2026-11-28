@@ -1,11 +1,13 @@
 import type { IncomingMessage, Server } from 'node:http';
 import { WebSocket, WebSocketServer } from 'ws';
 import { db } from './db.js';
+import { env } from './env.js';
 import { isSameOriginRequest, userFromCookieHeader } from './lib/auth.js';
 import { vncAuthResponse } from './lib/des.js';
 import { orgo } from './orgo.js';
 import { readyScreen, screenFor } from './computer.js';
 import { viewerClosed, viewerOpened } from './idle.js';
+import { serveBotScreen } from './cdpscreen.js';
 
 /**
  * VNC relay: browser <-> our server <-> Orgo websockify.
@@ -150,6 +152,7 @@ async function relay(client: WebSocket, userId: string, botId: string, mode: 'wa
   const fromUp = new ByteQueue();
   let upstream: WebSocket | null = null;
   let piping = false;
+  let local: { input: (b: Buffer) => void; close: () => void } | null = null; // desktop mode: the bot's own browser
   const filter = new WatchFilter();
   const closeAll = (code = 1000, reason = '') => {
     try { client.close(code, reason.slice(0, 120)); } catch { /* */ }
@@ -157,14 +160,24 @@ async function relay(client: WebSocket, userId: string, botId: string, mode: 'wa
   };
 
   client.on('message', (data: Buffer) => {
+    if (local) return local.input(Buffer.from(data));
     if (!piping) return fromClient.push(Buffer.from(data));
     const fwd = mode === 'watch' ? filter.feed(Buffer.from(data)) : Buffer.from(data);
     if (fwd.length && upstream?.readyState === WebSocket.OPEN) upstream.send(fwd);
   });
-  client.on('close', () => { viewerClosed(userId); fromClient.close(new Error('client closed')); try { upstream?.close(); } catch { /* */ } });
+  client.on('close', () => { viewerClosed(userId); local?.close(); fromClient.close(new Error('client closed')); try { upstream?.close(); } catch { /* */ } });
   viewerOpened(userId); // keeps the computer awake while someone is watching (see idle.ts)
 
   try {
+    if (env.local) {
+      await screenFor(userId, botId); // records the bot's screen (the preview needs it)
+      const l = await serveBotScreen(botId, mode, (init) => browserHandshake(fromClient, (b) => client.send(b), init), (b) => { if (client.readyState === WebSocket.OPEN) client.send(b); });
+      if (client.readyState !== WebSocket.OPEN) return l.close();
+      local = l;
+      const early = fromClient.takeAll(); // anything the viewer sent right after the handshake
+      if (early.length) l.input(early);
+      return;
+    }
     const { computerId, screenId } = await screenFor(userId, botId);
     // A screen nobody has used yet is bare; set it up while the person is already watching.
     readyScreen(userId, botId).catch(() => {});

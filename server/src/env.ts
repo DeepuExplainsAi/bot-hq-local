@@ -1,6 +1,8 @@
+import crypto from 'node:crypto';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 
 function req(name: string): string {
   const v = process.env[name];
@@ -22,10 +24,28 @@ function secret(name: string): string {
  * one (the placeholder from .env.example, or anything short) would let anyone in.
  */
 function sessionSecret(): string {
-  const v = req('SESSION_SECRET');
+  const v = process.env.SESSION_SECRET || (LOCAL ? installSecret() : req('SESSION_SECRET'));
   if (/^change-me/i.test(v) || v.length < 16) {
     throw new Error('SESSION_SECRET is the example placeholder or too short. Set it to a long random value, e.g. `openssl rand -hex 32`.');
   }
+  return v;
+}
+
+/**
+ * Desktop mode (the Electron app sets BOTHQ_LOCAL=1): everything runs on this laptop. Data lives in
+ * BOTHQ_DATA (the OS app-data folder), the server listens on 127.0.0.1 only, and nothing talks to Orgo.
+ */
+export const LOCAL = process.env.BOTHQ_LOCAL === '1';
+const repoPath = (rel: string) => fileURLToPath(new URL(rel, import.meta.url));
+const dataDir = process.env.BOTHQ_DATA ?? repoPath('../../data');
+
+/** Desktop mode: a random secret made on first run and kept (owner-only) in the app's data folder, so no one has to set one. */
+function installSecret(): string {
+  const file = path.join(dataDir, 'secret.key');
+  try { return fs.readFileSync(file, 'utf8').trim(); } catch { /* first run */ }
+  const v = crypto.randomBytes(32).toString('hex');
+  fs.mkdirSync(dataDir, { recursive: true });
+  fs.writeFileSync(file, v, { mode: 0o600 });
   return v;
 }
 
@@ -46,31 +66,37 @@ export function compatEnv(name: string): string | undefined {
 
 /** Default database file. One made before the rename (data/grokbot.db) keeps being used. */
 function defaultDbPath(): string {
-  const current = new URL('../../data/bothq.db', import.meta.url).pathname;
-  const legacy = new URL('../../data/grokbot.db', import.meta.url).pathname;
+  const current = path.join(dataDir, 'bothq.db');
+  const legacy = path.join(dataDir, 'grokbot.db');
   return !fs.existsSync(current) && fs.existsSync(legacy) ? legacy : current;
 }
 
-const hermesHome = process.env.HERMES_HOME_PRIMARY ?? path.join(os.homedir(), '.hermes');
+// Desktop mode never reads or writes ~/.hermes: the shared (read-only template) home is inside the app's own data folder.
+const hermesHome = process.env.HERMES_HOME_PRIMARY ?? (LOCAL ? path.join(dataDir, 'hermes-shared') : path.join(os.homedir(), '.hermes'));
 const appUrl = process.env.APP_URL ?? 'http://localhost:5173';
 
 export const env = {
+  local: LOCAL,
+  dataDir,
+  /** The built web app. In the desktop app it sits next to the server inside the package. */
+  webDist: process.env.BOTHQ_WEB_DIST ?? repoPath('../../web/dist'),
   port: Number(process.env.PORT ?? 8787),
   /**
    * Interface to listen on. Unset = this machine only (127.0.0.1) while APP_URL is a local address,
    * so a development server is not offered to the whole network; otherwise every interface (what an
    * Orgo public URL needs). HOST, when set, always wins.
    */
-  host: process.env.HOST || (isLoopbackUrl(appUrl) ? '127.0.0.1' : undefined),
+  host: LOCAL ? '127.0.0.1' : process.env.HOST || (isLoopbackUrl(appUrl) ? '127.0.0.1' : undefined),
   appUrl,
   /** Public URL of this server, used for OAuth callbacks. */
   serverUrl: process.env.SERVER_URL ?? `http://localhost:${process.env.PORT ?? 8787}`,
   /** The app is only reachable at a local address (development). Some conveniences are limited to this. */
   localOnly: isLoopbackUrl(appUrl),
-  xaiKey: req('XAI_API_KEY'),
+  /** Optional in desktop mode: without a key there is no call to xAI at all (x_search and voice stay off). */
+  xaiKey: LOCAL ? (process.env.XAI_API_KEY ?? '') : req('XAI_API_KEY'),
   xaiModel: process.env.XAI_MODEL ?? 'grok-4.7',
-  composioKey: req('COMPOSIO_API_KEY'),
-  orgoKey: secret('ORGO_API_KEY'),
+  composioKey: LOCAL ? '' : req('COMPOSIO_API_KEY'),
+  orgoKey: LOCAL ? '' : secret('ORGO_API_KEY'),
   sessionSecret: sessionSecret(),
   /** Email-only sign-in for testing. Honoured only when APP_URL is a local address (see routes.ts). */
   devLogin: process.env.DEV_LOGIN === '1' && isLoopbackUrl(appUrl),
@@ -84,7 +110,7 @@ export const env = {
   hermesUrl: (process.env.HERMES_URL ?? 'http://127.0.0.1:8642').replace(/\/+$/, ''),
   hermesKey: process.env.HERMES_KEY ?? '',
   /** Where each extra bot's own Hermes home lives. Must be outside ~/.hermes so it is a separate tenant. */
-  enginesDir: process.env.ENGINES_DIR ?? new URL('../../data/engines', import.meta.url).pathname,
+  enginesDir: process.env.ENGINES_DIR ?? path.join(dataDir, 'engines'),
   enginePortBase: Number(process.env.ENGINE_PORT_BASE ?? 8650),
   /** URL the Hermes gateways use to reach this server's MCP endpoint. */
   mcpBaseUrl: (process.env.MCP_BASE_URL ?? `http://127.0.0.1:${process.env.PORT ?? 8787}`).replace(/\/+$/, ''),
@@ -95,14 +121,16 @@ export const env = {
 
   // ---- the one shared computer ----
   /** The Orgo computer every bot works on (one screen each). Empty = legacy one-box-per-user mode is not supported. */
-  orgoComputerId: process.env.ORGO_COMPUTER_ID ?? '',
+  orgoComputerId: LOCAL ? '' : process.env.ORGO_COMPUTER_ID ?? '',
   /** This server runs on that computer, so shell commands run locally instead of through Orgo's API. */
-  localBox: process.env.HQ_LOCAL === '1',
+  localBox: LOCAL || process.env.HQ_LOCAL === '1',
   /**
    * DevTools URL of a Chrome that already runs on the default screen and belongs to the primary bot
    * (e.g. http://127.0.0.1:9333). When set, we never start or stop that screen's Chrome ourselves.
    */
   primaryCdpUrl: process.env.PRIMARY_CDP_URL ?? '',
+  /** Desktop mode: how to start one bot's browser (JSON {exe, args}, set by the desktop shell). Empty = no bot browsers. */
+  browserCmd: LOCAL ? process.env.BOTHQ_BROWSER_CMD ?? '' : '',
   /** Bots that can each have a screen (Orgo allows four screens on one Linux computer). */
   maxBots: Number(process.env.MAX_BOTS ?? 4),
   /**

@@ -5,7 +5,7 @@ import { box } from '../box.js';
 import { env } from '../env.js';
 import { libraryRoot } from '../paths.js';
 import { appendRow, getBotRow, listRoutines, toRoutine, describeCron } from '../store.js';
-import { batchActions, executeComposio, LOOKUP_META_TOOLS, MULTI_EXECUTE, SANDBOX_META_TOOLS, toolkitInfo } from '../composio.js';
+import { batchActions, catalog, executeComposio, LOOKUP_META_TOOLS, MULTI_EXECUTE, SANDBOX_META_TOOLS, toolkitInfo } from '../composio.js';
 import { scheduleRoutine, unscheduleRoutine } from '../routines.js';
 import { createEventRoutine, deleteEventTrigger, describeEvent, listTriggerTypes } from '../triggers.js';
 import { setCheckins } from '../proactive.js';
@@ -47,6 +47,7 @@ function botByName(userId: string, name: string) {
 
 /** Live X research through xAI's search tool. Returns the answer text followed by the posts it cites. */
 async function xSearch(a: any): Promise<string> {
+  if (!env.xaiKey) throw new Error('X search needs an xAI key. Add XAI_API_KEY in the app settings to turn it on.');
   const clean = (v: unknown) => (Array.isArray(v) ? v.map((h) => String(h).replace(/^@/, '').trim()).filter(Boolean).slice(0, 10) : []);
   const tool: Record<string, unknown> = { type: 'x_search' };
   const only = clean(a.handles);
@@ -139,10 +140,10 @@ export const TOOLS: ToolDef[] = [
   {
     name: 'list_event_triggers',
     description: 'List the event triggers a connected app offers (e.g. new email, new Slack message, new GitHub PR), with each trigger\'s config fields. Use before create_event_routine.',
-    parameters: obj({ toolkit: { type: 'string', description: 'Composio toolkit slug, e.g. gmail, slack, github, googlecalendar' } }, ['toolkit']),
+    parameters: obj({ toolkit: { type: 'string', description: 'App slug, e.g. gmail, slack, github, googlecalendar' } }, ['toolkit']),
     activity: 'connecting_service',
     label: 'Using a connected app',
-    impl: async (a) => ({ output: JSON.stringify(await listTriggerTypes(String(a.toolkit).toLowerCase())) }),
+    impl: async (a) => ({ output: env.local ? NO_EVENTS : JSON.stringify(await listTriggerTypes(String(a.toolkit).toLowerCase())) }),
   },
   {
     name: 'create_event_routine',
@@ -151,6 +152,7 @@ export const TOOLS: ToolDef[] = [
     activity: 'working',
     label: 'Setting up a routine',
     impl: async (a, ctx) => {
+      if (env.local) return { output: NO_EVENTS };
       let config: Record<string, unknown> = {};
       try { config = a.config_json ? JSON.parse(a.config_json) : {}; } catch { return { output: 'config_json must be a JSON object string.' }; }
       try {
@@ -315,18 +317,20 @@ export const TOOLS: ToolDef[] = [
   },
   {
     name: 'request_app_connection',
-    description: 'Ask the user to connect an app (e.g. gmail, googlecalendar, slack, github, notion, linear) so you can use it. Use the Composio toolkit slug.',
+    description: 'Ask the user to connect an app (e.g. gmail, googlecalendar, slack, github, notion, linear) so you can use it. Use the app slug.',
     parameters: obj({ toolkit: { type: 'string' }, reason: { type: 'string' } }, ['toolkit', 'reason']),
     activity: 'connecting_service',
     label: 'Using a connected app',
     impl: async (a, ctx) => {
       const info = await toolkitInfo(String(a.toolkit).toLowerCase());
-      if (!info) return { output: `Unknown toolkit "${a.toolkit}". Use COMPOSIO_SEARCH_TOOLS to find the right toolkit slug.` };
+      if (!info) return { output: `Unknown toolkit "${a.toolkit}". ${env.local ? `Apps that can be connected here: ${(await catalog()).map((t) => t.slug).join(', ')}.` : 'Use COMPOSIO_SEARCH_TOOLS to find the right toolkit slug.'}` };
       appendRow(ctx.botId, 'card', { type: 'card', card: 'connect', toolkit: info.slug, toolkitName: info.name, logo: info.logo, reason: a.reason, status: 'pending' });
       return { output: `Asked the user to connect ${info.name}. Stop here; you'll be told when it's connected.`, endTurn: true };
     },
   },
 ];
+
+const NO_EVENTS = 'Event routines are not available in the desktop app: there is no public address for an app to send events to. Offer a routine that checks on a schedule instead (create_routine), and say so.';
 
 export const toolMap = new Map(TOOLS.map((t) => [t.name, t]));
 
@@ -412,7 +416,7 @@ export function appToolName(raw: string): { name: string; ours: boolean; server?
   if (hq) {
     // Hermes may fold names to lower case; ours are matched case-insensitively.
     const hit = [...toolMap.keys()].find((k) => k.toLowerCase() === hq[1].toLowerCase());
-    return { name: hit ?? (/^composio_/i.test(hq[1]) ? hq[1].toUpperCase() : hq[1]), ours: true };
+    return { name: hit ?? hq[1].toUpperCase(), ours: true }; // what is not the app's own tool is a connected app's, whose names are upper case
   }
   const other = /^mcp_+([a-zA-Z0-9-]+?)_+(.+)$/.exec(raw);
   if (other) return { name: other[2], ours: false, server: other[1] };

@@ -7,7 +7,7 @@ import { batchActions, toolkitInfo } from '../composio.js';
 import { screenForWork } from '../computer.js';
 import { engineFor } from '../engine.js';
 import { instructionsFor } from './prompt.js';
-import { activityFor, appToolName, humanizeSlug, policyFor, type Policy } from './tools.js';
+import { activityFor, appToolName, humanizeSlug, policyFor, toolMap, type Policy } from './tools.js';
 
 /**
  * A turn: one message handed to the bot's Hermes engine and streamed back into the conversation.
@@ -449,7 +449,7 @@ async function runTurn(botId: string, trigger: Trigger) {
             if (!getLive(botId).awaiting) setLive(botId, { isRunning: true, activity: { kind, detail, since: now() }, steps, caption: null });
             else setLive(botId, { steps });
             reasoning = '';
-            if (ours && name.startsWith('COMPOSIO_')) {
+            if (ours && !toolMap.has(name)) {
               const tk = policyFor(userId, name, args ?? {}).toolkit;
               if (tk) {
                 void toolkitInfo(tk).then((info) => {

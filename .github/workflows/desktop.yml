@@ -1,0 +1,60 @@
+name: desktop
+# Ubuntu only until the final installer part (windows and macos builds run only there).
+on:
+  push:
+    branches: [local-installer]
+  workflow_dispatch:
+concurrency:
+  group: desktop-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  shell:
+    name: Electron shell smoke
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: |
+            package-lock.json
+            desktop/package-lock.json
+      - run: npm ci
+      - run: npm run build
+      - run: npm ci
+        working-directory: desktop
+      - uses: actions/cache@v4
+        with:
+          path: ~/.cache/electron
+          key: electron-${{ runner.os }}-${{ hashFiles('desktop/package-lock.json') }}
+      # The server runs inside Electron's own Node, so its native module must match Electron's ABI.
+      - name: Rebuild better-sqlite3 for Electron
+        run: npx --yes @electron/rebuild@4.2.1 -v 45.5.0 -w better-sqlite3 -f
+      - name: Launch the app under a virtual display
+        run: timeout 150 xvfb-run -a npx electron . --no-sandbox --smoke
+        working-directory: desktop
+
+  hermes:
+    name: Hermes first-run install (real)
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 22 }
+      - name: Install uv, Python and Hermes into a temp app-data folder
+        run: |
+          node -e "
+          const h = require('./desktop/hermes.cjs');
+          const root = require('path').join(require('os').tmpdir(), 'bothq-hermes');
+          h.ensureHermes(root, (t) => console.log('>', t)).then((bin) => { console.log('hermes at', bin); }, (e) => { console.error(e.message); process.exit(1); });
+          "
+      - name: It runs from the app-data folder and leaves ~/.hermes alone
+        run: |
+          BIN=/tmp/bothq-hermes/venv/bin/hermes
+          export HERMES_HOME=/tmp/bothq-hermes/check
+          "$BIN" --version
+          "$BIN" gateway --help | head -5
+          test ! -e "$HOME/.hermes" && echo "~/.hermes untouched"
