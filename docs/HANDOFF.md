@@ -40,6 +40,7 @@ The earlier billing block ("recent account payments have failed") only affected 
 | 6 | Verification report (`docs/VERIFICATION.md`) | DONE (tag part-6-done) |
 | 7 | Real Hermes install + gateway health on Windows and macOS | DONE (tag part-7-done) |
 | 8 | Bug and error check (`docs/BUGCHECK.md`) | DONE (tag part-8-done) |
+| 9 | Windows non-ASCII/space app-data smoke, release v0.1.1 | DONE (tag part-9-done) |
 
 ## Part 0 details
 Files: `tests/parity/mock-api.mjs` (fixed-data API, `/__signed-out`, WS upgrades destroyed), `tests/parity/shoot.mjs` (Playwright 1440x900,
@@ -172,3 +173,10 @@ The earlier handoff said TODO because the previous AI ran out of credit before w
 - `docs/MASTER_PROMPT.md` Part E holds the rules (think first, simplicity, surgical changes, goal-driven); root `CLAUDE.md` only points to it.
 - Decision: the source guidelines say "ask when unclear"; the user's instruction overrides that (pick the safest smallest option, record it here, stop only on the existing stop-rules).
 - Pending task from the user's last message: none open. The bug check (part 8) is done and tagged; nothing else was left pending.
+
+
+## Part 9 (non-ASCII path check, release v0.1.1) - DONE
+- Success check set first: installed Windows app `--smoke` with app-data under `...\Temp\Dīpū Gupta` must print SMOKE OK + BOT BROWSER OK. Added env `BOTHQ_SMOKE_DIR` (smoke only, `desktop/main.cjs`) and an extra Windows-only step in `installers.yml`. Result: PASS first time (run 46112737335), so no code fix was needed. A non-ASCII Windows *username* is still not tested.
+- Version bumped to 0.1.1 in `desktop/package.json` so file names match; README release link updated.
+- CI on `784ef13`: installers 46113248356 green, desktop 46113248360 green, parity 46113248355 FAILED once (verify steps 3, 5, 6: the fake gateway for the bot exited 1 while starting, a second start of the same gateway; looks like a start race under CI load) and passed on re-run of the failed job. Not investigated further: possible real race in `engine.ts` startGateway when a health check times out (adopt-vs-spawn). If it recurs, look there first.
+- Release v0.1.1 (pre-release) made from installers run 46113248356; assets: Windows .exe, macOS arm64 .dmg, Linux .AppImage + .deb. Nothing merged into main.
