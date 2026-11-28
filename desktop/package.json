@@ -1,6 +1,6 @@
 {
   "name": "bot-hq-desktop",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "private": true,
   "description": "Bot HQ as a desktop app: the server, the agents and the window all run on this computer.",
   "license": "MIT",
@@ -87,6 +87,7 @@
       "category": "Utility",
       "executableName": "bot-hq",
       "maintainer": "Bot HQ contributors <noreply@users.noreply.github.com>"
-    }
+    },
+    "afterPack": "after-pack.cjs"
   }
 }
